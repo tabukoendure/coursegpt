@@ -6,8 +6,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 
 const currentYear = new Date().getFullYear();
 const years = ['All Years', ...Array.from({ length: 8 }, (_, i) => String(currentYear - i))];
-const depts = ['All Departments', 'Nursing Science', 'Engineering', 'Law', 'Pharmacy', 'MBBS', 'Other'];
-
+const depts = ['All Departments', 'Nursing Science', 'Engineering', 'Law', 'Pharmacy', 'MBBS', 'Postgraduate', 'Other'];
 export default function Questions() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -119,16 +118,13 @@ export default function Questions() {
                 {years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
-            <div className="relative">
-              <select
-                value={deptFilter}
-                onChange={(e) => setDeptFilter(e.target.value)}
-                className="pl-6 pr-8 py-4 bg-bg border border-border rounded-2xl focus:outline-none focus:border-primary transition-all appearance-none text-xs font-black uppercase tracking-widest cursor-pointer"
-              >
-                {depts.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <button
+<input
+  type="text"
+  value={deptFilter === 'All Departments' ? '' : deptFilter}
+  onChange={(e) => setDeptFilter(e.target.value || 'All Departments')}
+  placeholder="Department..."
+  className="px-4 py-4 bg-bg border border-border rounded-2xl focus:outline-none focus:border-primary transition-all text-xs font-black uppercase tracking-widest w-40"
+/>            <button
               type="submit"
               className="flex-1 lg:flex-none px-8 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
             >
@@ -274,10 +270,10 @@ export default function Questions() {
             {/* PDF iframe viewer */}
             <div className="flex-1 overflow-hidden">
               <iframe
-                src={`${viewingPdf.url}#toolbar=0&navpanes=0&scrollbar=1`}
-                className="w-full h-full border-0"
-                title={`${viewingPdf.title} Past Question`}
-              />
+  src={`https://docs.google.com/viewer?url=${encodeURIComponent(viewingPdf.url)}&embedded=true`}
+  className="w-full h-full border-0"
+  title={`${viewingPdf.title} Past Question`}
+/>
             </div>
 
             {/* Bottom bar */}

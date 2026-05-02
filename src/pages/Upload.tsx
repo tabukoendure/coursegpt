@@ -88,7 +88,7 @@ export default function Upload() {
 
       setSuccess(true);
       setFile(null);
-      setFormData({ courseCode: '', courseName: '', year: '2024', department: 'Sciences', description: '' });
+      setFormData({ courseCode: '', courseName: '', year: '2026', department: 'Sciences', description: '' });
       setTimeout(() => { 
         setSuccess(false); 
         setActiveTab('my-uploads'); 
@@ -186,20 +186,19 @@ export default function Upload() {
                         value={formData.year}
                         onChange={e => setFormData({...formData, year: e.target.value})}
                         className="w-full px-6 py-4 bg-bg border border-border rounded-2xl focus:border-primary outline-none transition-all font-bold text-xs"
-                      >
-                         {years.map(y => <option key={y}>{y}</option>)}
-                      </select>
-                   </div>
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1">Department</label>
-                      <select 
-                        value={formData.department}
-                        onChange={e => setFormData({...formData, department: e.target.value})}
-                        className="w-full px-6 py-4 bg-bg border border-border rounded-2xl focus:border-primary outline-none transition-all font-bold text-xs"
-                      >
-                         {depts.map(d => <option key={d}>{d}</option>)}
-                      </select>
-                   </div>
+                      >{years.map(y => <option key={y}>{y}</option>)}
+</select>
+</div>
+
+<div className="space-y-2">
+  <label className="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1">Department</label>
+  <input
+    type="text"
+    value={formData.department}
+  onChange={e => setFormData({...formData, department: e.target.value})}
+  placeholder="e.g. Nursing Science, Postgraduate, Engineering..."
+  className="w-full px-6 py-4 bg-bg border border-border rounded-2xl focus:border-primary outline-none transition-all font-bold text-xs"
+/>                   </div>
                 </div>
 
                 <div className="space-y-2">
