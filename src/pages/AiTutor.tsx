@@ -270,9 +270,9 @@ export default function AiTutor() {
         text,
         courseCode,
         mode,
-        pdfContext || undefined
-      );
-
+pdfContext || undefined,
+  messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-6).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+);
       const aiMsg: ChatMessage = {
         role: 'assistant',
         content: response,

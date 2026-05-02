@@ -238,7 +238,8 @@ export async function askGemini(
   courseCode?: string,
   mode: 'explain' | 'predict' | 'quiz' |
     'mark' | 'summarize' | 'general' = 'general',
-  pdfContext?: string
+  pdfContext?: string,
+  conversationHistory?: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<string> {
   try {
     const groq = getGroq();
@@ -274,12 +275,28 @@ uploaded document."`;
       }
     }
 
+    // Build messages array with conversation history
+    const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      { role: 'system', content: SYSTEM_PROMPT }
+    ];
+
+    // Add last 6 messages of history for context
+    if (conversationHistory && conversationHistory.length > 0) {
+      const recentHistory = conversationHistory.slice(-6);
+      for (const msg of recentHistory) {
+        messages.push({
+          role: msg.role,
+          content: msg.content
+        });
+      }
+    }
+
+    // Add current message
+    messages.push({ role: 'user', content: finalPrompt });
+
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: finalPrompt }
-      ],
+      messages,
       temperature: 0.7,
       max_tokens: 2048,
     });
