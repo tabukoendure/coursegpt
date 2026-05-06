@@ -33,10 +33,16 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth
-        .signInWithPassword({ email, password });
-      if (error) throw error;
-      navigate('/dashboard');
+     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+if (error) throw error;
+
+if (!data.user?.email_confirmed_at) {
+  setError('Please verify your email first. Check your inbox for the verification link.');
+  await supabase.auth.signOut();
+  return;
+}
+
+navigate('/dashboard');
     } catch (err: any) {
       setError(
         err.message === 'Invalid login credentials'
