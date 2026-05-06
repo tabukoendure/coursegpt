@@ -51,8 +51,14 @@ export default function Planner() {
         .limit(1)
         .maybeSingle();
       
-      if (planData) setPlan(planData);
-
+if (planData) {
+  try {
+    const days = JSON.parse(planData.plan_content);
+    setPlan({ ...planData, days: Array.isArray(days) ? days : [] });
+  } catch {
+    setPlan({ ...planData, days: [] });
+  }
+}
       // Fetch progress
       const { data: progressData } = await supabase
         .from('plan_progress')
@@ -129,8 +135,7 @@ Rules:
         .from('study_plans')
         .insert([{
           user_id: user.id,
-          plan_content: response,
-          days: days
+          plan_content: response, 
         }])
         .select()
         .single();
