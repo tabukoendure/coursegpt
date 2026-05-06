@@ -298,13 +298,17 @@ uploaded document."`;
       model: "llama-3.3-70b-versatile",
       messages,
       temperature: 0.7,
-      max_tokens: 2048,
+      max_tokens: 1024,
     });
 
     return completion.choices[0]?.message?.content ||
       "I could not generate a response. Please try again.";
-  } catch (error) {
+} catch (error: any) {
     console.error("AI Error:", error);
+    if (error?.message?.includes('429') || 
+        error?.message?.includes('rate_limit')) {
+      return "I am getting too many requests right now. Please wait 10 seconds and try again.";
+    }
     return `Error: ${error instanceof Error ? error.message : "Failed to connect to AI."}`;
   }
 }
