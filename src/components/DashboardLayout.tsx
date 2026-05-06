@@ -72,6 +72,7 @@ const sidebarItems = [
   { name: 'Summary', path: '/dashboard/summary', icon: FileText },
   { name: 'Flashcards', path: '/dashboard/flashcards', icon: Layers },
   { name: 'Upload & Earn', path: '/dashboard/upload', icon: Upload },
+  { name: 'Quiz', path: '/dashboard/quiz', icon: BookOpen },
 ];
 
   const accountItems = [
