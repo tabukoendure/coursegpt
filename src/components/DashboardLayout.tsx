@@ -59,14 +59,13 @@ export default function DashboardLayout() {
     await supabase.auth.signOut();
     navigate('/login');
   };
-
-  const navItems = [
-    { name: 'Home', path: '/dashboard', icon: Layout },
-    { name: 'Questions', path: '/dashboard/questions', icon: BookOpen },
-    { name: 'AI Tutor', path: '/dashboard/ai', icon: MessageSquare },
-    { name: 'Planner', path: '/dashboard/planner', icon: Calendar },
-    { name: 'Recap', path: '/dashboard/recap', icon: Award },
-  ];
+const navItems = [
+  { name: 'Home', path: '/dashboard', icon: Layout },
+  { name: 'AI Tutor', path: '/dashboard/ai', icon: MessageSquare },
+  { name: 'Planner', path: '/dashboard/planner', icon: Calendar },
+  { name: 'Summary', path: '/dashboard/summary', icon: FileText },
+  { name: 'Flashcards', path: '/dashboard/flashcards', icon: Layers },
+];
 
 const sidebarItems = [
   ...navItems,
