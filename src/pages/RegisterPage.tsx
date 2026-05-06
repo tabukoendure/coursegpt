@@ -23,11 +23,6 @@ export default function RegisterPage() {
   const [error, setError] = 
     React.useState<string | null>(null);
 
-  const departments = [
-    'Nursing Science', 'Engineering', 'Law',
-    'Pharmacy', 'MBBS', 'Other'
-  ];
-
   // Redirect if already logged in
   React.useEffect(() => {
     const checkSession = async () => {
@@ -293,38 +288,29 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-[10px] 
-                font-black text-text-secondary mb-2 
-                uppercase tracking-widest">
-                Department
-              </label>
-              <div className="relative">
-                <select
-                  value={formData.department}
-                  onChange={e => setFormData({ 
-                    ...formData, 
-                    department: e.target.value 
-                  })}
-                  className="w-full px-4 py-4 bg-bg 
-                    border border-border rounded-2xl 
-                    focus:outline-none focus:ring-4 
-                    focus:ring-primary/10 
-                    focus:border-primary transition-all 
-                    font-bold text-text-primary 
-                    appearance-none"
-                >
-                  <option value="">Select...</option>
-                  {departments.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-4 
-                  top-1/2 -translate-y-1/2 h-4 w-4 
-                  text-text-secondary pointer-events-none" 
-                />
-              </div>
-            </div>
+<div>
+  <label className="block text-[10px] 
+    font-black text-text-secondary mb-2 
+    uppercase tracking-widest">
+    Department
+  </label>
+  <input
+    type="text"
+    required
+    value={formData.department}
+    onChange={e => setFormData({ 
+      ...formData, 
+      department: e.target.value 
+    })}
+    placeholder="e.g. Nursing Science"
+    className="w-full px-4 py-4 bg-bg 
+      border border-border rounded-2xl 
+      focus:outline-none focus:ring-4 
+      focus:ring-primary/10 
+      focus:border-primary transition-all 
+      font-bold text-text-primary"
+  />
+</div>
           </div>
 
           {/* Submit */}

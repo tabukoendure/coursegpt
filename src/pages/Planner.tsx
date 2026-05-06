@@ -140,11 +140,14 @@ Rules:
         .select()
         .single();
 
-      if (!error && data) {
-        setPlan(data);
-        await supabase.from('plan_progress').delete().eq('user_id', user.id);
-        setCompletedTasks([]);
-      }
+if (!error && data) {
+  const parsedDays = response
+    .split('\n')
+    .filter(line => line.includes('DAY') && line.includes(':'));
+  setPlan({ ...data, days: parsedDays });
+  await supabase.from('plan_progress').delete().eq('user_id', user.id);
+  setCompletedTasks([]);
+}
     } catch (err) {
       console.error(err);
     } finally {
