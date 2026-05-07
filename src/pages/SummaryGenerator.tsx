@@ -24,8 +24,9 @@ export default function SummaryGenerator() {
         .select('*')
         .eq('user_id', user.id)
         .order('exam_date', { ascending: true });
-      setExams(data || []);
-      if (data && data.length > 0) setSelectedExam(data[0]);
+      const withPdf = (data || []).filter((e: any) => e.pdf_url);
+setExams(withPdf);
+if (withPdf.length > 0) setSelectedExam(withPdf[0]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -123,11 +124,11 @@ Make it detailed, specific to Nigerian university exam patterns, and easy to scr
           <div className="h-20 w-20 bg-bg rounded-[2rem] flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-border">
             <BookOpen className="h-10 w-10 text-text-secondary opacity-20" />
           </div>
-          <h3 className="text-xl font-black text-text-primary mb-2">No exams added yet</h3>
-          <p className="text-sm text-text-secondary mb-6">Go to the Study Planner and add your exams first.</p>
-          <a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">
-            Go to Planner
-          </a>
+       <h3 className="text-xl font-black text-text-primary mb-2">No PDF uploaded yet</h3>
+<p className="text-sm text-text-secondary mb-6">Summary Generator only works with exams that have a PDF uploaded. Go to the Study Planner and upload a PDF for your exam.</p>
+<a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">
+  Go to Planner → Upload PDF
+</a>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -179,13 +180,6 @@ Make it detailed, specific to Nigerian university exam patterns, and easy to scr
                   : <><Sparkles className="h-4 w-4" /> {summary ? 'Regenerate' : 'Generate Summary'}</>
                 }
               </button>
-
-              {!selectedExam?.pdf_url && selectedExam && (
-                <p className="text-[10px] text-text-secondary text-center mt-3 font-bold opacity-60">
-                  ⚠️ No PDF uploaded for this exam. Summary will be AI-generated from general knowledge.
-                  <a href="/dashboard/planner" className="text-primary ml-1 hover:underline">Add PDF →</a>
-                </p>
-              )}
             </div>
           </div>
 

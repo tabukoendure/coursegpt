@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Sparkles, Loader2, RefreshCw, ChevronLeft, ChevronRight, Share2, RotateCcw, BookOpen } from 'lucide-react';
+import { Layers, Sparkles, Loader2, RefreshCw, ChevronLeft, ChevronRight, Share2, RotateCcw, BookOpen, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { askGemini } from '../lib/gemini';
@@ -18,6 +18,7 @@ export default function Flashcards() {
   const [loading, setLoading] = React.useState(true);
   const [genLoading, setGenLoading] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
+  const [error, setError] = React.useState('');
 
   React.useEffect(() => {
     fetchExams();
@@ -32,8 +33,10 @@ export default function Flashcards() {
         .select('*')
         .eq('user_id', user.id)
         .order('exam_date', { ascending: true });
-      setExams(data || []);
-      if (data && data.length > 0) setSelectedExam(data[0]);
+      // Only show exams with PDF
+      const withPdf = (data || []).filter((e: any) => e.pdf_url);
+      setExams(withPdf);
+      if (withPdf.length > 0) setSelectedExam(withPdf[0]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -41,13 +44,30 @@ export default function Flashcards() {
     }
   };
 
-  const generateCards = async () => {
+  const parseCards = (text: string): Flashcard[] | null => {
+    try {
+      const clean = text.replace(/```json|```/g, '').trim();
+      const start = clean.indexOf('[');
+      const end = clean.lastIndexOf(']');
+      if (start === -1 || end === -1) return null;
+      const parsed = JSON.parse(clean.substring(start, end + 1));
+      if (!Array.isArray(parsed) || parsed.length === 0) return null;
+      // Validate structure
+      if (!parsed[0].front || !parsed[0].back) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const generateCards = async (retryCount = 0) => {
     if (!selectedExam) return;
     setGenLoading(true);
     setCards([]);
     setCurrentIdx(0);
     setFlipped(false);
     setSaved(false);
+    setError('');
 
     try {
       const prompt = `You are creating flashcards for a Nigerian university student at Achievers University preparing for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}.
@@ -62,28 +82,33 @@ Focus on:
 - Concepts likely to appear in Nigerian university exams
 - Practical applications
 
-Return ONLY a valid JSON array, no explanation, no markdown, no backticks. Exactly like this:
+IMPORTANT: Return ONLY a valid JSON array. No explanation, no markdown, no backticks, no extra text before or after.
 [
   {"front": "term or question here", "back": "definition or answer here"},
   {"front": "term or question here", "back": "definition or answer here"}
 ]`;
 
       const response = await askGemini(prompt, selectedExam.course_code);
+      const parsed = parseCards(response);
 
-      // Parse JSON safely
-      const clean = response.replace(/```json|```/g, '').trim();
-      const start = clean.indexOf('[');
-      const end = clean.lastIndexOf(']');
-      if (start === -1 || end === -1) throw new Error('No JSON array found');
-      const parsed: Flashcard[] = JSON.parse(clean.substring(start, end + 1));
-      setCards(parsed);
-    } catch (err) {
+      if (parsed) {
+        setCards(parsed);
+      } else if (retryCount < 2) {
+        // Auto retry up to 2 times
+        setGenLoading(false);
+        setTimeout(() => generateCards(retryCount + 1), 1500);
+        return;
+      } else {
+        setError('Could not generate flashcards after multiple attempts. Please try again.');
+      }
+    } catch (err: any) {
+      if (retryCount < 2) {
+        setGenLoading(false);
+        setTimeout(() => generateCards(retryCount + 1), 2000);
+        return;
+      }
+      setError('Something went wrong. Please try again in a moment.');
       console.error(err);
-      // Fallback: generate basic cards
-      setCards([{
-        front: 'Failed to generate cards',
-        back: 'Please try again. Make sure you have a stable internet connection.'
-      }]);
     } finally {
       setGenLoading(false);
     }
@@ -138,231 +163,215 @@ Return ONLY a valid JSON array, no explanation, no markdown, no backticks. Exact
     </div>
   );
 
+  // No exams with PDF at all
+  if (exams.length === 0) return (
+    <div className="space-y-8">
+      <header>
+        <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight">Flashcards</h1>
+        <p className="text-sm text-text-secondary mt-1 font-medium">AI-generated flashcards from your course PDF.</p>
+      </header>
+      <div className="bg-white rounded-[2rem] border border-border p-16 text-center shadow-sm">
+        <div className="h-20 w-20 bg-bg rounded-[2rem] flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-border">
+          <BookOpen className="h-10 w-10 text-text-secondary opacity-20" />
+        </div>
+        <h3 className="text-xl font-black text-text-primary mb-2">No PDF uploaded yet</h3>
+        <p className="text-sm text-text-secondary mb-6">Flashcards are generated from your course PDF. Go to the Study Planner, add an exam and upload its PDF.</p>
+        <a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">
+          Go to Planner → Upload PDF
+        </a>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-8">
-
-      {/* Header */}
       <header>
         <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight">Flashcards</h1>
         <p className="text-sm text-text-secondary mt-1 font-medium">
-          AI-generated flashcards from your course material. Flip, study, ace your exam.
+          AI-generated flashcards from your course PDF. Flip, study, ace your exam.
         </p>
       </header>
 
-      {exams.length === 0 ? (
-        <div className="bg-white rounded-[2rem] border border-border p-16 text-center shadow-sm">
-          <div className="h-20 w-20 bg-bg rounded-[2rem] flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-border">
-            <BookOpen className="h-10 w-10 text-text-secondary opacity-20" />
-          </div>
-          <h3 className="text-xl font-black text-text-primary mb-2">No exams added yet</h3>
-          <p className="text-sm text-text-secondary mb-6">Go to the Study Planner and add your exams first.</p>
-          <a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">
-            Go to Planner
-          </a>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* Left — Exam Picker */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm">
-              <h2 className="text-xs font-black text-text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Layers className="h-4 w-4 text-primary" /> Select Exam
-              </h2>
-              <div className="space-y-2">
-                {exams.map(exam => (
-                  <button
-                    key={exam.id}
-                    onClick={() => { setSelectedExam(exam); setCards([]); setCurrentIdx(0); setFlipped(false); }}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedExam?.id === exam.id ? 'bg-primary text-white border-primary' : 'bg-bg border-border hover:border-primary/40'}`}
-                  >
-                    <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>
-                      {exam.course_code}
-                    </div>
-                    <div className={`text-[10px] font-medium mt-0.5 truncate ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>
-                      {exam.course_name || 'Achievers Course'}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={generateCards}
-                disabled={genLoading || !selectedExam}
-                className="w-full mt-6 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/10 disabled:opacity-50"
-              >
-                {genLoading
-                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
-                  : <><Sparkles className="h-4 w-4" /> {cards.length ? 'Regenerate' : 'Generate Flashcards'}</>
-                }
-              </button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left — Exam Picker */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm">
+            <h2 className="text-xs font-black text-text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Layers className="h-4 w-4 text-primary" /> Select Exam
+            </h2>
+            <div className="space-y-2">
+              {exams.map(exam => (
+                <button
+                  key={exam.id}
+                  onClick={() => { setSelectedExam(exam); setCards([]); setCurrentIdx(0); setFlipped(false); setError(''); }}
+                  className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedExam?.id === exam.id ? 'bg-primary text-white border-primary' : 'bg-bg border-border hover:border-primary/40'}`}
+                >
+                  <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>
+                    {exam.course_code}
+                  </div>
+                  <div className={`text-[10px] font-medium mt-0.5 truncate ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>
+                    {exam.course_name || 'Achievers Course'}
+                  </div>
+                  <div className={`text-[8px] font-black mt-1 uppercase ${selectedExam?.id === exam.id ? 'text-white/50' : 'text-primary'}`}>
+                    PDF ✓
+                  </div>
+                </button>
+              ))}
             </div>
 
-            {/* Stats */}
-            {cards.length > 0 && (
-              <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-black text-text-secondary uppercase tracking-widest">Progress</span>
-                  <span className="text-xs font-black text-primary">{currentIdx + 1} / {cards.length}</span>
-                </div>
-                <div className="w-full h-2 bg-bg rounded-full overflow-hidden">
-                  <motion.div
-                    animate={{ width: `${((currentIdx + 1) / cards.length) * 100}%` }}
-                    className="h-full bg-primary rounded-full"
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => generateCards(0)}
+              disabled={genLoading || !selectedExam}
+              className="w-full mt-6 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/10 disabled:opacity-50"
+            >
+              {genLoading
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+                : <><Sparkles className="h-4 w-4" /> {cards.length ? 'Regenerate' : 'Generate Flashcards'}</>
+              }
+            </button>
+
+            {error && (
+              <div className="mt-3 p-3 bg-error/10 border border-error/20 rounded-xl flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-error shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-[10px] font-black text-error uppercase tracking-widest mb-1">Generation Failed</p>
+                  <p className="text-[10px] text-error/80 font-medium">{error}</p>
                   <button
-                    onClick={saveCards}
-                    className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border ${saved ? 'bg-success/10 text-success border-success/20' : 'bg-bg border-border text-text-secondary hover:border-primary hover:text-primary'}`}
+                    onClick={() => generateCards(0)}
+                    className="text-[10px] font-black text-primary uppercase tracking-widest mt-2 hover:underline"
                   >
-                    {saved ? '✓ Saved!' : 'Save Cards'}
-                  </button>
-                  <button
-                    onClick={shareToWhatsApp}
-                    className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl bg-green-50 text-green-600 border border-green-100 hover:bg-green-500 hover:text-white transition-all"
-                  >
-                    Share
+                    Try Again →
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Right — Flashcard Display */}
-          <div className="lg:col-span-2">
-            {cards.length > 0 ? (
-              <div className="space-y-6">
+          {cards.length > 0 && (
+            <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-black text-text-secondary uppercase tracking-widest">Progress</span>
+                <span className="text-xs font-black text-primary">{currentIdx + 1} / {cards.length}</span>
+              </div>
+              <div className="w-full h-2 bg-bg rounded-full overflow-hidden">
+                <motion.div
+                  animate={{ width: `${((currentIdx + 1) / cards.length) * 100}%` }}
+                  className="h-full bg-primary rounded-full"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={saveCards}
+                  className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border ${saved ? 'bg-success/10 text-success border-success/20' : 'bg-bg border-border text-text-secondary hover:border-primary hover:text-primary'}`}
+                >
+                  {saved ? '✓ Saved!' : 'Save Cards'}
+                </button>
+                <button
+                  onClick={shareToWhatsApp}
+                  className="flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl bg-green-50 text-green-600 border border-green-100 hover:bg-green-500 hover:text-white transition-all"
+                >
+                  Share
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
-                {/* Card */}
-                <div className="relative h-72 md:h-80 cursor-pointer" onClick={() => setFlipped(f => !f)} style={{ perspective: '1000px' }}>
-                  <motion.div
-                    animate={{ rotateY: flipped ? 180 : 0 }}
-                    transition={{ duration: 0.5, type: 'spring', stiffness: 100 }}
-                    style={{ transformStyle: 'preserve-3d' }}
-                    className="relative w-full h-full"
+        {/* Right — Flashcard Display */}
+        <div className="lg:col-span-2">
+          {cards.length > 0 ? (
+            <div className="space-y-6">
+              <div className="relative h-72 md:h-80 cursor-pointer" onClick={() => setFlipped(f => !f)} style={{ perspective: '1000px' }}>
+                <motion.div
+                  animate={{ rotateY: flipped ? 180 : 0 }}
+                  transition={{ duration: 0.5, type: 'spring', stiffness: 100 }}
+                  style={{ transformStyle: 'preserve-3d' }}
+                  className="relative w-full h-full"
+                >
+                  <div
+                    className="absolute inset-0 bg-white rounded-[2rem] border border-border shadow-sm flex flex-col items-center justify-center p-8 text-center"
+                    style={{ backfaceVisibility: 'hidden' }}
                   >
-                    {/* Front */}
-                    <div
-                      className="absolute inset-0 bg-white rounded-[2rem] border border-border shadow-sm flex flex-col items-center justify-center p-8 text-center"
-                      style={{ backfaceVisibility: 'hidden' }}
-                    >
-                      <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-4 opacity-60">
-                        Tap to reveal answer
-                      </div>
-                      <h3 className="text-xl md:text-2xl font-black text-text-primary tracking-tight leading-tight">
-                        {cards[currentIdx]?.front}
-                      </h3>
-                      <div className="absolute bottom-6 right-6 text-[10px] font-black text-text-secondary opacity-40 uppercase tracking-widest">
-                        {currentIdx + 1} / {cards.length}
-                      </div>
-                    </div>
+                    <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-4 opacity-60">Tap to reveal answer</div>
+                    <h3 className="text-xl md:text-2xl font-black text-text-primary tracking-tight leading-tight">{cards[currentIdx]?.front}</h3>
+                    <div className="absolute bottom-6 right-6 text-[10px] font-black text-text-secondary opacity-40 uppercase tracking-widest">{currentIdx + 1} / {cards.length}</div>
+                  </div>
+                  <div
+                    className="absolute inset-0 bg-primary rounded-[2rem] shadow-xl shadow-primary/20 flex flex-col items-center justify-center p-8 text-center"
+                    style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                  >
+                    <div className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-4">Answer</div>
+                    <p className="text-base md:text-lg font-bold text-white leading-relaxed">{cards[currentIdx]?.back}</p>
+                  </div>
+                </motion.div>
+              </div>
 
-                    {/* Back */}
-                    <div
-                      className="absolute inset-0 bg-primary rounded-[2rem] shadow-xl shadow-primary/20 flex flex-col items-center justify-center p-8 text-center"
-                      style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-                    >
-                      <div className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-4">
-                        Answer
-                      </div>
-                      <p className="text-base md:text-lg font-bold text-white leading-relaxed">
-                        {cards[currentIdx]?.back}
-                      </p>
+              <div className="flex items-center justify-between gap-4">
+                <button onClick={prev} disabled={currentIdx === 0} className="flex items-center gap-2 px-6 py-4 bg-white border border-border rounded-2xl font-black text-xs uppercase tracking-widest text-text-secondary hover:border-primary hover:text-primary transition-all disabled:opacity-30">
+                  <ChevronLeft className="h-4 w-4" /> Prev
+                </button>
+                <button onClick={restart} className="flex items-center gap-2 px-4 py-4 bg-bg border border-border rounded-2xl font-black text-xs uppercase tracking-widest text-text-secondary hover:bg-white transition-all">
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+                {currentIdx === cards.length - 1 ? (
+                  <button onClick={restart} className="flex items-center gap-2 px-6 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all">
+                    <RefreshCw className="h-4 w-4" /> Restart
+                  </button>
+                ) : (
+                  <button onClick={next} className="flex items-center gap-2 px-6 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all">
+                    Next <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-white rounded-[2rem] border border-border shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-border">
+                  <h3 className="text-xs font-black text-text-primary uppercase tracking-widest">All Cards ({cards.length})</h3>
+                </div>
+                <div className="divide-y divide-border max-h-80 overflow-y-auto">
+                  {cards.map((card, i) => (
+                    <button key={i} onClick={() => { setCurrentIdx(i); setFlipped(false); }} className={`w-full text-left p-4 hover:bg-bg transition-all ${currentIdx === i ? 'bg-primary/5 border-l-4 border-primary' : ''}`}>
+                      <div className="font-black text-xs text-text-primary truncate">{card.front}</div>
+                      <div className="text-[10px] text-text-secondary mt-0.5 truncate">{card.back}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full min-h-[400px] bg-white rounded-[2rem] border border-border flex flex-col items-center justify-center text-center p-12 shadow-sm">
+              <AnimatePresence>
+                {genLoading ? (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6 flex flex-col items-center">
+                    <div className="h-20 w-20 bg-primary/10 rounded-[2rem] flex items-center justify-center animate-pulse">
+                      <Layers className="h-10 w-10 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Creating your flashcards...</h3>
+                      <p className="text-text-secondary text-sm font-medium">Extracting key terms from your course PDF.</p>
+                    </div>
+                    <div className="flex space-x-2">
+                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
+                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse [animation-delay:0.2s]" />
+                      <div className="h-2 w-2 bg-primary rounded-full animate-pulse [animation-delay:0.4s]" />
                     </div>
                   </motion.div>
-                </div>
-
-                {/* Navigation */}
-                <div className="flex items-center justify-between gap-4">
-                  <button
-                    onClick={prev}
-                    disabled={currentIdx === 0}
-                    className="flex items-center gap-2 px-6 py-4 bg-white border border-border rounded-2xl font-black text-xs uppercase tracking-widest text-text-secondary hover:border-primary hover:text-primary transition-all disabled:opacity-30"
-                  >
-                    <ChevronLeft className="h-4 w-4" /> Prev
-                  </button>
-
-                  <button
-                    onClick={restart}
-                    className="flex items-center gap-2 px-4 py-4 bg-bg border border-border rounded-2xl font-black text-xs uppercase tracking-widest text-text-secondary hover:bg-white transition-all"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </button>
-
-                  {currentIdx === cards.length - 1 ? (
-                    <button
-                      onClick={restart}
-                      className="flex items-center gap-2 px-6 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all"
-                    >
-                      <RefreshCw className="h-4 w-4" /> Restart
-                    </button>
-                  ) : (
-                    <button
-                      onClick={next}
-                      className="flex items-center gap-2 px-6 py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all"
-                    >
-                      Next <ChevronRight className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* All cards list */}
-                <div className="bg-white rounded-[2rem] border border-border shadow-sm overflow-hidden">
-                  <div className="p-5 border-b border-border">
-                    <h3 className="text-xs font-black text-text-primary uppercase tracking-widest">All Cards ({cards.length})</h3>
-                  </div>
-                  <div className="divide-y divide-border max-h-80 overflow-y-auto">
-                    {cards.map((card, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { setCurrentIdx(i); setFlipped(false); }}
-                        className={`w-full text-left p-4 hover:bg-bg transition-all ${currentIdx === i ? 'bg-primary/5 border-l-4 border-primary' : ''}`}
-                      >
-                        <div className="font-black text-xs text-text-primary truncate">{card.front}</div>
-                        <div className="text-[10px] text-text-secondary mt-0.5 truncate">{card.back}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full min-h-[400px] bg-white rounded-[2rem] border border-border flex flex-col items-center justify-center text-center p-12 shadow-sm">
-                <AnimatePresence>
-                  {genLoading ? (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6 flex flex-col items-center">
-                      <div className="h-20 w-20 bg-primary/10 rounded-[2rem] flex items-center justify-center animate-pulse">
-                        <Layers className="h-10 w-10 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Creating your flashcards...</h3>
-                        <p className="text-text-secondary text-sm font-medium">Extracting key terms and definitions from your course.</p>
-                      </div>
-                      <div className="flex space-x-2">
-                        <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-                        <div className="h-2 w-2 bg-primary rounded-full animate-pulse [animation-delay:0.2s]" />
-                        <div className="h-2 w-2 bg-primary rounded-full animate-pulse [animation-delay:0.4s]" />
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                      <div className="h-24 w-24 bg-bg rounded-[2rem] flex items-center justify-center mx-auto border-2 border-dashed border-border">
-                        <Layers className="h-12 w-12 text-text-secondary opacity-20" />
-                      </div>
-                      <div>
-                        <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Ready to create cards</h3>
-                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">
-                          Select an exam and click Generate Flashcards to start studying.
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-          </div>
+                ) : (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                    <div className="h-24 w-24 bg-bg rounded-[2rem] flex items-center justify-center mx-auto border-2 border-dashed border-border">
+                      <Layers className="h-12 w-12 text-text-secondary opacity-20" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Ready to create cards</h3>
+                      <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">Select an exam and click Generate Flashcards to start studying.</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

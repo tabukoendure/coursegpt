@@ -1,8 +1,9 @@
 import React from 'react';
-import { Calendar, Plus, Trash2, Sparkles, CheckCircle2, Loader2, Target, BookOpen, FileText, MessageSquare, Share2, X } from 'lucide-react';
+import { Calendar, Plus, Trash2, Sparkles, CheckCircle2, Loader2, Target, BookOpen, FileText, MessageSquare, Share2, X, MoreVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { askGemini } from '../lib/gemini';
 import { supabase } from '../lib/supabase';
+import Markdown from 'react-markdown';
 
 interface Exam {
   id: string;
@@ -22,9 +23,17 @@ export default function Planner() {
   const [genLoading, setGenLoading] = React.useState(false);
   const [completedTasks, setCompletedTasks] = React.useState<number[]>([]);
   const [aiModal, setAiModal] = React.useState<{ open: boolean; topic: string; response: string; loading: boolean }>({ open: false, topic: '', response: '', loading: false });
+  const [menuOpen, setMenuOpen] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     fetchUserData();
+  }, []);
+
+  // Close menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => setMenuOpen(null);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
   }, []);
 
   const fetchUserData = async () => {
@@ -79,8 +88,6 @@ export default function Planner() {
     if (!user) return;
 
     let pdf_url = '';
-
-    // Upload PDF if provided
     if (examPdf) {
       const filePath = `exam-pdfs/${user.id}/${newExam.code.toUpperCase()}_${Date.now()}.pdf`;
       const { error: uploadError } = await supabase.storage
@@ -117,16 +124,19 @@ export default function Planner() {
   const removeExam = async (id: string) => {
     const { error } = await supabase.from('user_exams').delete().eq('id', id);
     if (!error) setExams(exams.filter(e => e.id !== id));
+    setMenuOpen(null);
   };
 
   const generatePlan = async () => {
-    if (exams.length === 0) return;
+    // Only allow if at least one exam has a PDF
+    const examsWithPdf = exams.filter(e => e.pdf_url);
+    if (examsWithPdf.length === 0) return;
     setGenLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const today = new Date().toISOString().split('T')[0];
-    const examList = exams.map(e => `${e.course_code} (${e.course_name}) on ${e.exam_date} (Difficulty: ${e.difficulty})`).join(', ');
+    const examList = examsWithPdf.map(e => `${e.course_code} (${e.course_name}) on ${e.exam_date} (Difficulty: ${e.difficulty})`).join(', ');
 
     const prompt = `Create a detailed daily study plan for a Nigerian university student at Achievers University with these upcoming exams: ${examList}. 
 Rules: 
@@ -211,6 +221,8 @@ Be specific, practical and encouraging.`;
     return Math.ceil((examDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   };
 
+  const examsWithPdf = exams.filter(e => e.pdf_url);
+
   if (loading) return (
     <div className="animate-pulse space-y-8">
       <div className="h-10 w-64 bg-border rounded-lg" />
@@ -259,7 +271,9 @@ Be specific, practical and encouraging.`;
                   <p className="text-sm font-bold text-text-secondary">AI is explaining this topic...</p>
                 </div>
               ) : (
-                <div className="text-sm text-text-primary font-medium leading-relaxed whitespace-pre-wrap">{aiModal.response}</div>
+                <div className="prose prose-sm max-w-none prose-headings:font-black prose-headings:text-text-primary prose-headings:tracking-tight prose-p:text-text-secondary prose-p:font-medium prose-strong:text-text-primary prose-li:text-text-secondary prose-li:font-medium">
+                  <Markdown>{aiModal.response}</Markdown>
+                </div>
               )}
             </motion.div>
           </motion.div>
@@ -270,7 +284,7 @@ Be specific, practical and encouraging.`;
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight">Study Planner</h1>
-          <p className="text-sm text-text-secondary mt-1 font-medium">Data-driven revision plans built around your Achievers exam calendar.</p>
+          <p className="text-sm text-text-secondary mt-1 font-medium">Upload your course PDF to generate a smart study plan.</p>
         </div>
         <div className="flex items-center gap-3">
           {plan && (
@@ -331,7 +345,7 @@ Be specific, practical and encouraging.`;
               </div>
 
               {/* PDF Upload */}
-              <label className={`flex items-center gap-3 w-full px-5 py-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${examPdf ? 'border-success bg-success/5' : 'border-border bg-bg hover:border-primary'}`}>
+              <label className={`flex items-center gap-3 w-full px-5 py-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${examPdf ? 'border-success bg-success/5' : 'border-primary/40 bg-primary/5 hover:border-primary'}`}>
                 <input
                   type="file"
                   accept=".pdf"
@@ -341,12 +355,12 @@ Be specific, practical and encouraging.`;
                     if (f && f.type === 'application/pdf') setExamPdf(f);
                   }}
                 />
-                <FileText className={`h-5 w-5 shrink-0 ${examPdf ? 'text-success' : 'text-text-secondary'}`} />
+                <FileText className={`h-5 w-5 shrink-0 ${examPdf ? 'text-success' : 'text-primary'}`} />
                 <div className="flex-1 overflow-hidden">
-                  <p className={`text-xs font-black uppercase tracking-widest truncate ${examPdf ? 'text-success' : 'text-text-secondary'}`}>
-                    {examPdf ? examPdf.name : 'Upload Course PDF (optional)'}
+                  <p className={`text-xs font-black uppercase tracking-widest truncate ${examPdf ? 'text-success' : 'text-primary'}`}>
+                    {examPdf ? examPdf.name : 'Upload Course PDF (required for plan)'}
                   </p>
-                  <p className="text-[10px] text-text-secondary opacity-60 mt-0.5">Used for Summary & Flashcards</p>
+                  <p className="text-[10px] text-text-secondary opacity-60 mt-0.5">Powers Smart Plan, Summary & Flashcards</p>
                 </div>
                 {examPdf && (
                   <button
@@ -383,7 +397,7 @@ Be specific, practical and encouraging.`;
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   key={exam.id}
-                  className="bg-white p-5 rounded-2xl border border-border flex justify-between items-center group shadow-sm"
+                  className="bg-white p-5 rounded-2xl border border-border flex justify-between items-center shadow-sm"
                 >
                   <div className="flex-1 truncate mr-3">
                     <div className="flex items-center space-x-2 mb-0.5">
@@ -391,23 +405,49 @@ Be specific, practical and encouraging.`;
                       <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter ${days < 7 ? 'bg-error text-white' : 'bg-bg text-text-secondary'}`}>
                         {days === 0 ? 'Today' : days < 0 ? 'Ended' : `${days}d`}
                       </span>
-                      {exam.pdf_url && (
+                      {exam.pdf_url ? (
                         <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter bg-primary/10 text-primary">
-                          PDF
+                          PDF ✓
+                        </span>
+                      ) : (
+                        <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter bg-error/10 text-error">
+                          No PDF
                         </span>
                       )}
                     </div>
                     <div className="text-[10px] text-text-secondary font-medium truncate">{exam.course_name || 'Achievers Course'}</div>
                   </div>
-                  <button onClick={() => removeExam(exam.id)} className="p-2 text-text-secondary hover:text-error transition-colors opacity-0 group-hover:opacity-100">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+
+                  {/* Three dot menu */}
+                  <div className="relative">
+                    <button
+                      onClick={e => { e.stopPropagation(); setMenuOpen(menuOpen === exam.id ? null : exam.id); }}
+                      className="p-2 text-text-secondary hover:text-primary transition-colors rounded-xl hover:bg-bg"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                    {menuOpen === exam.id && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="absolute right-0 top-10 bg-white border border-border rounded-2xl shadow-xl z-20 overflow-hidden w-36"
+                      >
+                        <button
+                          onClick={() => removeExam(exam.id)}
+                          className="w-full flex items-center gap-2 px-4 py-3 text-error text-xs font-black uppercase tracking-widest hover:bg-error/5 transition-all"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
+                      </motion.div>
+                    )}
+                  </div>
                 </motion.div>
               );
             })}
           </div>
 
-          {exams.length > 0 && (
+          {/* Generate button — only if at least one exam has PDF */}
+          {examsWithPdf.length > 0 && (
             <button
               onClick={generatePlan}
               disabled={genLoading}
@@ -416,6 +456,14 @@ Be specific, practical and encouraging.`;
               {genLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Sparkles className="h-5 w-5 mr-3" />}
               {plan ? 'Regenerate Study Plan' : 'Generate Smart Plan'}
             </button>
+          )}
+
+          {/* Message if exams exist but none have PDF */}
+          {exams.length > 0 && examsWithPdf.length === 0 && (
+            <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl text-center">
+              <p className="text-xs font-black text-primary uppercase tracking-widest mb-1">PDF Required</p>
+              <p className="text-[10px] text-text-secondary font-medium">Upload a PDF when adding your exam to unlock the Smart Plan.</p>
+            </div>
           )}
         </div>
 
@@ -435,9 +483,7 @@ Be specific, practical and encouraging.`;
                       initial={{ width: 0 }}
                       animate={{ width: `${progress}%` }}
                       className="h-full bg-primary relative"
-                    >
-                      <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.1)_50%,transparent_75%)] bg-[length:20px_20px]" />
-                    </motion.div>
+                    />
                   </div>
                   <p className="text-[10px] text-text-secondary mt-3 font-bold uppercase tracking-widest">
                     {completedTasks.length} OF {plan.days.length} TASKS COMPLETED
@@ -473,7 +519,6 @@ Be specific, practical and encouraging.`;
                         </div>
                       </div>
 
-                      {/* Action buttons */}
                       {!isDone && (
                         <div className="flex items-center gap-2 mt-4 ml-14">
                           <button
@@ -505,7 +550,7 @@ Be specific, practical and encouraging.`;
                     </div>
                     <div className="max-w-xs">
                       <h3 className="text-3xl font-black text-text-primary mb-4 tracking-tighter">AI is planning your success...</h3>
-                      <p className="text-text-secondary text-sm leading-relaxed font-medium">Calculating optimal study spans and topics based on Achievers University trends.</p>
+                      <p className="text-text-secondary text-sm leading-relaxed font-medium">Calculating optimal study spans and topics from your PDF.</p>
                     </div>
                     <div className="flex space-x-2">
                       <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
@@ -525,7 +570,9 @@ Be specific, practical and encouraging.`;
                     </div>
                     <div>
                       <h3 className="text-3xl font-black text-text-primary mb-4 tracking-tighter">Ready for Straight A's?</h3>
-                      <p className="text-text-secondary text-sm max-w-sm mx-auto leading-relaxed font-medium">Add your exams and we'll build you a daily mission-focused revision plan.</p>
+                      <p className="text-text-secondary text-sm max-w-sm mx-auto leading-relaxed font-medium">
+                        Add your exams with a PDF uploaded and we'll build you a daily mission-focused revision plan.
+                      </p>
                     </div>
                   </motion.div>
                 )}
