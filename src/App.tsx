@@ -12,6 +12,7 @@ import Upload from './pages/Upload';
 import Recap from './pages/Recap';
 import SummaryGenerator from './pages/SummaryGenerator';
 import Flashcards from './pages/Flashcards';
+import Cheatsheet from './pages/Cheatsheet';
 import Quiz from './pages/Quiz';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="recap" element={<Recap />} />
           <Route path="summary" element={<SummaryGenerator />} />
           <Route path="flashcards" element={<Flashcards />} />
+          <Route path="cheatsheet" element={<Cheatsheet />} />
           <Route path="quiz" element={<Quiz />} />
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
