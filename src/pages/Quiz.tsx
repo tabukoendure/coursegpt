@@ -54,9 +54,9 @@ export default function Quiz() {
         .select('*')
         .eq('user_id', user.id)
         .order('exam_date', { ascending: true });
-      setExams(examsData || []);
-      if (examsData && examsData.length > 0) setSelectedExam(examsData[0]);
-
+const withPdf = (examsData || []).filter((e: any) => e.pdf_url);
+setExams(withPdf);
+if (withPdf.length > 0) setSelectedExam(withPdf[0]);
       const { data: quizData } = await supabase
         .from('saved_quizzes')
         .select('*')

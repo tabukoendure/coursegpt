@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Layout, BookOpen, MessageSquare, Calendar, Upload, User, Settings, LogOut, GraduationCap, Bell, Award, Zap, FileText, Layers, Moon, TrendingUp } from 'lucide-react';import { supabase } from '../lib/supabase';
-import { motion } from 'motion/react';
+import { Layout, BookOpen, MessageSquare, Calendar, Upload, User, Settings, LogOut, GraduationCap, Bell, Award, Zap, FileText, Layers, Moon, TrendingUp, Menu, X, ChevronRight } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [profile, setProfile] = React.useState<any>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   React.useEffect(() => {
     const fetchProfile = async () => {
@@ -54,31 +56,36 @@ export default function DashboardLayout() {
     fetchProfile();
   }, [navigate]);
 
+  // Close menu on route change
+  React.useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
-const navItems = [
-  { name: 'Home', path: '/dashboard', icon: Layout },
-  { name: 'AI Tutor', path: '/dashboard/ai', icon: MessageSquare },
-  { name: 'Planner', path: '/dashboard/planner', icon: Calendar },
-  { name: 'Quiz', path: '/dashboard/quiz', icon: BookOpen },
-  { name: 'Summary', path: '/dashboard/summary', icon: FileText },
-];
 
-const sidebarItems = [
-  { name: 'Home', path: '/dashboard', icon: Layout },
-  { name: 'Questions', path: '/dashboard/questions', icon: BookOpen },
-  { name: 'AI Tutor', path: '/dashboard/ai', icon: MessageSquare },
-  { name: 'Planner', path: '/dashboard/planner', icon: Calendar },
-  { name: 'Quiz', path: '/dashboard/quiz', icon: BookOpen },
-  { name: 'Summary', path: '/dashboard/summary', icon: FileText },
-  { name: 'Flashcards', path: '/dashboard/flashcards', icon: Layers },
-  { name: 'Cheatsheet', path: '/dashboard/cheatsheet', icon: Moon },
-  { name: 'Progress', path: '/dashboard/progress', icon: TrendingUp },
-  { name: 'Recap', path: '/dashboard/recap', icon: Award },
-  { name: 'Upload & Earn', path: '/dashboard/upload', icon: Upload },
-];
+  const sidebarItems = [
+    { name: 'Home', path: '/dashboard', icon: Layout },
+    { name: 'Questions', path: '/dashboard/questions', icon: BookOpen },
+    { name: 'AI Tutor', path: '/dashboard/ai', icon: MessageSquare },
+    { name: 'Planner', path: '/dashboard/planner', icon: Calendar },
+    { name: 'Quiz', path: '/dashboard/quiz', icon: BookOpen },
+    { name: 'Summary', path: '/dashboard/summary', icon: FileText },
+    { name: 'Flashcards', path: '/dashboard/flashcards', icon: Layers },
+    { name: 'Cheatsheet', path: '/dashboard/cheatsheet', icon: Moon },
+    { name: 'Progress', path: '/dashboard/progress', icon: TrendingUp },
+    { name: 'Recap', path: '/dashboard/recap', icon: Award },
+    { name: 'Upload & Earn', path: '/dashboard/upload', icon: Upload },
+  ];
+
+  const bottomNavItems = [
+    { name: 'Home', path: '/dashboard', icon: Layout },
+    { name: 'AI Tutor', path: '/dashboard/ai', icon: MessageSquare },
+    { name: 'Planner', path: '/dashboard/planner', icon: Calendar },
+    { name: 'Profile', path: '/dashboard/profile', icon: User },
+  ];
 
   const accountItems = [
     { name: 'Profile', path: '/dashboard/profile', icon: User },
@@ -101,18 +108,115 @@ const sidebarItems = [
             COURSE<span className="text-primary">GPT</span>
           </span>
         </div>
-        <div className="flex items-center space-x-3">
-          <button className="p-2 text-text-secondary">
-            <Bell className="h-5 w-5" />
-          </button>
-          <Link
-            to="/dashboard/profile"
-            className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs"
-          >
-            {profile.full_name?.[0]}
-          </Link>
-        </div>
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="p-2 text-text-secondary hover:text-primary transition-colors"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
       </div>
+
+      {/* Mobile Drawer — Full Menu */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/50 z-[60] md:hidden"
+            />
+
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-72 bg-white z-[70] md:hidden flex flex-col shadow-2xl"
+            >
+              {/* Drawer Header */}
+              <div className="p-5 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-lg">
+                    {profile.full_name?.[0]}
+                  </div>
+                  <div>
+                    <div className="text-sm font-black text-text-primary truncate max-w-[140px]">{profile.full_name}</div>
+                    <div className="text-[10px] text-text-secondary font-bold">{profile.level}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 text-text-secondary hover:text-primary transition-colors rounded-xl hover:bg-bg"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Drawer Nav */}
+              <div className="flex-1 overflow-y-auto py-4 px-3">
+                <p className="px-3 text-[10px] uppercase font-black text-text-secondary tracking-widest mb-3 opacity-40">
+                  Navigation
+                </p>
+                <div className="space-y-1">
+                  {sidebarItems.map(item => (
+                    <Link
+                      key={item.name}
+                      to={item.path}
+                      className={`flex items-center justify-between px-4 py-3 rounded-2xl font-bold transition-all ${location.pathname === item.path ? 'bg-primary text-white' : 'text-text-secondary hover:bg-bg'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon className={`h-5 w-5 ${location.pathname === item.path ? 'text-white' : 'text-text-secondary'}`} />
+                        <span className="text-sm">{item.name}</span>
+                      </div>
+                      {location.pathname === item.path && <ChevronRight className="h-4 w-4 text-white/60" />}
+                    </Link>
+                  ))}
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-border">
+                  <p className="px-3 text-[10px] uppercase font-black text-text-secondary tracking-widest mb-3 opacity-40">
+                    Account
+                  </p>
+                  <div className="space-y-1">
+                    {accountItems.map(item => (
+                      <Link
+                        key={item.name}
+                        to={item.path}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl font-bold transition-all ${location.pathname === item.path ? 'bg-primary-light text-primary' : 'text-text-secondary hover:bg-bg'}`}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        <span className="text-sm">{item.name}</span>
+                      </Link>
+                    ))}
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-error hover:bg-error/5 transition-all"
+                    >
+                      <LogOut className="h-5 w-5" />
+                      <span className="text-sm">Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Streak badge */}
+              <div className="p-4 border-t border-border">
+                <div className="bg-primary/5 border border-primary/10 rounded-2xl px-4 py-3 flex items-center gap-3">
+                  <span className="text-xl">🔥</span>
+                  <div>
+                    <div className="text-xs font-black text-primary">{profile.study_streak || 1} Day Streak</div>
+                    <div className="text-[10px] text-text-secondary font-medium">Keep it up!</div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Desktop Sidebar */}
       <aside className="w-64 border-r border-border bg-white hidden md:flex flex-col h-screen sticky top-0">
@@ -195,23 +299,29 @@ const sidebarItems = [
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-border px-4 flex items-center justify-around z-50 pb-2">
-        {navItems.map((item) => (
+      {/* Mobile Bottom Navigation — Home, AI Tutor, Planner, Profile */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-border px-2 flex items-center justify-around z-50 pb-2">
+        {bottomNavItems.map((item) => (
           <Link
             key={item.name}
             to={item.path}
-            className={`flex flex-col items-center justify-center space-y-1 transition-all ${location.pathname === item.path ? 'text-primary' : 'text-text-secondary opacity-60'}`}
+            className={`flex flex-col items-center justify-center space-y-1 px-3 transition-all ${location.pathname === item.path ? 'text-primary' : 'text-text-secondary opacity-60'}`}
           >
             <item.icon className={`h-5 w-5 ${location.pathname === item.path ? 'stroke-[2.5px]' : 'stroke-2'}`} />
             <span className={`text-[10px] font-black uppercase tracking-tighter ${location.pathname === item.path ? 'opacity-100' : 'opacity-80'}`}>
               {item.name}
             </span>
-            {location.pathname === item.path && (
-              <motion.div layoutId="bottomNavDot" className="h-1 w-1 bg-primary rounded-full absolute -bottom-1" />
-            )}
           </Link>
         ))}
+
+        {/* More button */}
+        <button
+          onClick={() => setMobileMenuOpen(true)}
+          className="flex flex-col items-center justify-center space-y-1 px-3 text-text-secondary opacity-60"
+        >
+          <Menu className="h-5 w-5 stroke-2" />
+          <span className="text-[10px] font-black uppercase tracking-tighter opacity-80">More</span>
+        </button>
       </nav>
 
     </div>
