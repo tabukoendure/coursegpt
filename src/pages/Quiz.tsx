@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Sparkles, Loader2, RefreshCw, Share2, CheckCircle2, XCircle, ChevronRight, RotateCcw, Trophy, Layers } from 'lucide-react';
+import { BookOpen, Sparkles, Loader2, RefreshCw, Share2, CheckCircle2, XCircle, ChevronRight, RotateCcw, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { askGemini } from '../lib/gemini';
@@ -54,9 +54,9 @@ export default function Quiz() {
         .select('*')
         .eq('user_id', user.id)
         .order('exam_date', { ascending: true });
-const withPdf = (examsData || []).filter((e: any) => e.pdf_url);
-setExams(withPdf);
-if (withPdf.length > 0) setSelectedExam(withPdf[0]);
+      setExams(examsData || []);
+      if (examsData && examsData.length > 0) setSelectedExam(examsData[0]);
+
       const { data: quizData } = await supabase
         .from('saved_quizzes')
         .select('*')
@@ -84,16 +84,33 @@ if (withPdf.length > 0) setSelectedExam(withPdf[0]);
     setSaved(false);
 
     try {
+      const courseContext = `${selectedExam.course_code} (${selectedExam.course_name})`;
+      let pdfContext = '';
+
+      if (selectedExam.pdf_url) {
+        try {
+          const res = await fetch(selectedExam.pdf_url);
+          const arrayBuffer = await res.arrayBuffer();
+          const base64 = btoa(
+            new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          pdfContext = `\nUse this course material as your primary source:\nPDF Content (base64): ${base64.substring(0, 2000)}`;
+        } catch {
+          // continue without PDF
+        }
+      }
+
       let prompt = '';
 
       if (quizType === 'mcq') {
-        prompt = `Generate exactly ${questionCount} MCQ questions for a Nigerian university student at Achievers University studying ${selectedExam.course_code} (${selectedExam.course_name}).
+        prompt = `Generate exactly ${questionCount} MCQ questions for a Nigerian university student at Achievers University studying ${courseContext}. Exam date: ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.${pdfContext}
 
 Rules:
 - Questions must be exam-standard, specific and challenging
 - Each question must have exactly 4 options (A, B, C, D)
 - Include questions on key concepts, definitions, applications
 - Based on Nigerian university exam patterns
+${selectedExam.pdf_url ? '- Base questions on the provided course material' : ''}
 
 Return ONLY a valid JSON array, no explanation, no markdown, no backticks:
 [
@@ -106,12 +123,13 @@ Return ONLY a valid JSON array, no explanation, no markdown, no backticks:
   }
 ]`;
       } else if (quizType === 'theory') {
-        prompt = `Generate exactly ${questionCount} theory questions for a Nigerian university student at Achievers University studying ${selectedExam.course_code} (${selectedExam.course_name}).
+        prompt = `Generate exactly ${questionCount} theory questions for a Nigerian university student at Achievers University studying ${courseContext}. Exam date: ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.${pdfContext}
 
 Rules:
 - Questions must be exam-standard and specific
 - Include both short answer and long answer questions
 - Based on Nigerian university exam patterns
+${selectedExam.pdf_url ? '- Base questions on the provided course material' : ''}
 
 Return ONLY a valid JSON array, no explanation, no markdown, no backticks:
 [
@@ -125,9 +143,10 @@ Return ONLY a valid JSON array, no explanation, no markdown, no backticks:
       } else {
         const mcqCount = Math.floor(questionCount * 0.6);
         const theoryCount = questionCount - mcqCount;
-        prompt = `Generate a mixed quiz for a Nigerian university student at Achievers University studying ${selectedExam.course_code} (${selectedExam.course_name}).
+        prompt = `Generate a mixed quiz for a Nigerian university student at Achievers University studying ${courseContext}. Exam date: ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.${pdfContext}
 
 Generate exactly ${mcqCount} MCQ questions and ${theoryCount} theory questions.
+${selectedExam.pdf_url ? 'Base questions on the provided course material.' : ''}
 
 Return ONLY a valid JSON array mixing both types, no explanation, no markdown, no backticks:
 [
@@ -170,7 +189,6 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
 
   const handleNext = () => {
     if (currentIdx === questions.length - 1) {
-      // Calculate score for MCQ questions
       let correctCount = 0;
       questions.forEach((q, i) => {
         if (q.type === 'mcq' && answers[i] === q.correctAnswer) correctCount++;
@@ -328,16 +346,39 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
 
               {/* Exam selector */}
               <div>
-                <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Course</label>
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">
+                  Select Exam
+                </label>
                 <div className="space-y-2">
-                  {exams.map(exam => (
+                  {exams.length === 0 ? (
+                    <div className="text-center py-6 bg-bg rounded-2xl border border-border">
+                      <p className="text-xs font-bold text-text-secondary mb-2">No exams added yet</p>
+                      <a href="/dashboard/planner" className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">
+                        Go to Planner → Add Exam
+                      </a>
+                    </div>
+                  ) : exams.map(exam => (
                     <button
                       key={exam.id}
                       onClick={() => { setSelectedExam(exam); setQuestions([]); }}
                       className={`w-full text-left p-3 rounded-2xl border transition-all ${selectedExam?.id === exam.id ? 'bg-primary text-white border-primary' : 'bg-bg border-border hover:border-primary/40'}`}
                     >
-                      <div className={`font-black text-xs uppercase ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
-                      <div className={`text-[10px] truncate ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name}</div>
+                      <div className="flex items-center justify-between">
+                        <div className={`font-black text-xs uppercase ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>
+                          {exam.course_code}
+                        </div>
+                        {exam.pdf_url && (
+                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
+                            PDF ✓
+                          </span>
+                        )}
+                      </div>
+                      <div className={`text-[10px] truncate mt-0.5 ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>
+                        {exam.course_name}
+                      </div>
+                      <div className={`text-[8px] font-black mt-1 uppercase ${selectedExam?.id === exam.id ? 'text-white/50' : 'text-text-secondary opacity-60'}`}>
+                        {exam.difficulty} • {new Date(exam.exam_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -374,6 +415,14 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
                   ))}
                 </div>
               </div>
+
+              {selectedExam?.pdf_url && (
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl">
+                  <p className="text-[10px] font-black text-primary uppercase tracking-widest">
+                    📄 PDF detected — quiz will be based on your course material
+                  </p>
+                </div>
+              )}
 
               <button
                 onClick={generateQuiz}
@@ -432,14 +481,15 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
                       </div>
                       <div>
                         <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Ready to quiz you</h3>
-                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">Pick your course, type and number of questions, then hit Generate.</p>
+                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">
+                          Pick your exam, type and number of questions, then hit Generate.
+                        </p>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
             ) : quizDone ? (
-              /* Results Screen */
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-[2rem] border border-border shadow-sm overflow-hidden">
                 <div className={`p-8 text-center ${score / mcqQuestions >= 0.7 ? 'bg-success' : score / mcqQuestions >= 0.5 ? 'bg-primary' : 'bg-error'}`}>
                   <Trophy className="h-12 w-12 text-white mx-auto mb-3" />
@@ -448,7 +498,9 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
                   </h2>
                   <p className="text-white/80 font-bold mt-1">
                     {mcqQuestions > 0
-                      ? score / mcqQuestions >= 0.7 ? '🎉 Excellent! You are exam ready!' : score / mcqQuestions >= 0.5 ? '👍 Good effort! Keep studying!' : '📚 Keep practicing, you will get there!'
+                      ? score / mcqQuestions >= 0.7 ? '🎉 Excellent! You are exam ready!'
+                        : score / mcqQuestions >= 0.5 ? '👍 Good effort! Keep studying!'
+                        : '📚 Keep practicing, you will get there!'
                       : 'Theory answers recorded!'
                     }
                   </p>
@@ -502,9 +554,7 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
                 </div>
               </motion.div>
             ) : (
-              /* Active Quiz */
               <div className="space-y-4">
-                {/* Progress bar */}
                 <div className="bg-white rounded-2xl border border-border p-4 shadow-sm">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{selectedExam?.course_code} Quiz</span>
@@ -518,7 +568,6 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
                   </div>
                 </div>
 
-                {/* Question Card */}
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentIdx}
