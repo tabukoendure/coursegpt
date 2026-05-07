@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Layout, BookOpen, MessageSquare, Calendar, Upload, User, Settings, LogOut, GraduationCap, Bell, Award, Zap, FileText, Layers, Moon } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { Layout, BookOpen, MessageSquare, Calendar, Upload, User, Settings, LogOut, GraduationCap, Bell, Award, Zap, FileText, Layers, Moon, TrendingUp } from 'lucide-react';import { supabase } from '../lib/supabase';
 import { motion } from 'motion/react';
 
 export default function DashboardLayout() {
@@ -73,6 +72,7 @@ const sidebarItems = [
   { name: 'Flashcards', path: '/dashboard/flashcards', icon: Layers },
   { name: 'Quiz', path: '/dashboard/quiz', icon: BookOpen },
   { name: 'Cheatsheet', path: '/dashboard/cheatsheet', icon: Moon },
+  { name: 'Progress', path: '/dashboard/progress', icon: TrendingUp },
   { name: 'Upload & Earn', path: '/dashboard/upload', icon: Upload },
 ];
 
