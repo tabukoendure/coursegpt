@@ -599,9 +599,6 @@ Then give:
                 <button onClick={() => handleSend("What common exam topics should I focus on?", "predict")} className="p-4 bg-white border border-border rounded-2xl text-[10px] font-bold hover:border-primary transition-all text-center">
                   🎯 Exam Predictions
                 </button>
-                <button onClick={handleGenerateQuiz} className="p-4 bg-white border border-border rounded-2xl text-[10px] font-bold hover:border-primary transition-all text-center">
-                  📝 Generate Quiz
-                </button>
                 <button onClick={() => handleSend("Give me a study plan for this week.", "general")} className="p-4 bg-white border border-border rounded-2xl text-[10px] font-bold hover:border-primary transition-all text-center">
                   📅 Study Plan
                 </button>
@@ -691,10 +688,6 @@ Then give:
         <div className="px-4 py-2 bg-white border-t border-border flex items-center gap-2 overflow-x-auto shrink-0">
           <button onClick={() => setShowUploadModal(true)} className="flex items-center whitespace-nowrap px-3 py-2 bg-bg border border-border rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-primary transition-all gap-1.5">
             <FileUp className="h-3.5 w-3.5" /> Upload PDF
-          </button>
-          <button onClick={handleGenerateQuiz} disabled={quizGenerating} className="flex items-center whitespace-nowrap px-3 py-2 bg-bg border border-border rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-primary transition-all gap-1.5 disabled:opacity-50">
-            {quizGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Target className="h-3.5 w-3.5" />}
-            {quizGenerating ? 'Generating...' : 'Generate Quiz'}
           </button>
           <button onClick={() => handleSend("What topics will most likely come out in the next exam?", "predict")} className="flex items-center whitespace-nowrap px-3 py-2 bg-bg border border-border rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-primary transition-all gap-1.5">
             <Sparkles className="h-3.5 w-3.5" /> Exam Predictions

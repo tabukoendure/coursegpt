@@ -29,7 +29,6 @@ export default function Planner() {
     fetchUserData();
   }, []);
 
-  // Close menu when clicking outside
   React.useEffect(() => {
     const handleClick = () => setMenuOpen(null);
     document.addEventListener('click', handleClick);
@@ -128,7 +127,6 @@ export default function Planner() {
   };
 
   const generatePlan = async () => {
-    // Only allow if at least one exam has a PDF
     const examsWithPdf = exams.filter(e => e.pdf_url);
     if (examsWithPdf.length === 0) return;
     setGenLoading(true);
@@ -170,6 +168,16 @@ Rules:
     } finally {
       setGenLoading(false);
     }
+  };
+
+  const deletePlan = async () => {
+    if (!window.confirm('Delete your current study plan? This cannot be undone.')) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('study_plans').delete().eq('user_id', user.id);
+    await supabase.from('plan_progress').delete().eq('user_id', user.id);
+    setPlan(null);
+    setCompletedTasks([]);
   };
 
   const toggleTask = async (idx: number) => {
@@ -446,7 +454,7 @@ Be specific, practical and encouraging.`;
             })}
           </div>
 
-          {/* Generate button — only if at least one exam has PDF */}
+          {/* Generate button */}
           {examsWithPdf.length > 0 && (
             <button
               onClick={generatePlan}
@@ -476,7 +484,15 @@ Be specific, practical and encouraging.`;
                 <div className="flex-1 relative z-10">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-black text-text-primary text-lg tracking-tight uppercase">Study Progress</h3>
-                    <span className="text-sm font-black text-primary">{progress}%</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-black text-primary">{progress}%</span>
+                      <button
+                        onClick={deletePlan}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-error/10 text-error text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-error hover:text-white transition-all"
+                      >
+                        <Trash2 className="h-3 w-3" /> Delete Plan
+                      </button>
+                    </div>
                   </div>
                   <div className="w-full h-4 bg-bg rounded-full overflow-hidden border border-border/50">
                     <motion.div
