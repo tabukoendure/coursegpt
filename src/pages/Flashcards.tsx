@@ -61,58 +61,88 @@ export default function Flashcards() {
   };
 
   const generateCards = async (retryCount = 0) => {
-    if (!selectedExam) return;
-    setGenLoading(true);
-    setCards([]);
-    setCurrentIdx(0);
-    setFlipped(false);
-    setSaved(false);
-    setError('');
+  if (!selectedExam) return;
+  setGenLoading(true);
+  setCards([]);
+  setCurrentIdx(0);
+  setFlipped(false);
+  setSaved(false);
+  setError('');
 
-    try {
-      const prompt = `You are creating flashcards for a Nigerian university student at Achievers University preparing for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}.
-
-Generate exactly 20 flashcards. Each flashcard must have:
-- FRONT: A key term, concept, or question
-- BACK: The definition, explanation, or answer (2-4 sentences max, clear and memorable)
-
-Focus on:
-- Key definitions and terms
-- Important laws, rules, or formulas
-- Concepts likely to appear in Nigerian university exams
-- Practical applications
-
-IMPORTANT: Return ONLY a valid JSON array. No explanation, no markdown, no backticks, no extra text before or after.
-[
-  {"front": "term or question here", "back": "definition or answer here"},
-  {"front": "term or question here", "back": "definition or answer here"}
-]`;
-
-      const response = await askGemini(prompt, selectedExam.course_code);
-      const parsed = parseCards(response);
-
-      if (parsed) {
-        setCards(parsed);
-      } else if (retryCount < 2) {
-        // Auto retry up to 2 times
-        setGenLoading(false);
-        setTimeout(() => generateCards(retryCount + 1), 1500);
-        return;
-      } else {
-        setError('Could not generate flashcards after multiple attempts. Please try again.');
+  try {
+    // Fetch PDF content
+    let pdfContext = '';
+    if (selectedExam.pdf_url) {
+      try {
+        const res = await fetch(selectedExam.pdf_url);
+        const arrayBuffer = await res.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        pdfContext = `\nBase your flashcards on this course material:\nPDF Content (base64): ${base64.substring(0, 2000)}`;
+      } catch {
+        // continue without PDF
       }
-    } catch (err: any) {
-      if (retryCount < 2) {
-        setGenLoading(false);
-        setTimeout(() => generateCards(retryCount + 1), 2000);
-        return;
-      }
-      setError('Something went wrong. Please try again in a moment.');
-      console.error(err);
-    } finally {
-      setGenLoading(false);
     }
-  };
+
+    const prompt = `You are creating flashcards for a Nigerian university student at Achievers University preparing for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}.${pdfContext}
+
+Generate exactly 20 flashcards based on the course material above. Each flashcard must have:
+- front: A key term, concept, or exam question
+- back: The definition, explanation, or answer (2-4 sentences, clear and memorable)
+
+YOU MUST RETURN ONLY THIS EXACT FORMAT - a JSON array with no other text:
+[{"front":"term here","back":"definition here"},{"front":"term here","back":"definition here"}]`;
+
+    const response = await askGemini(prompt, selectedExam.course_code);
+
+    // Very robust JSON extraction
+    let parsed: any[] | null = null;
+
+    // Try 1: direct parse after cleanup
+    try {
+      const clean = response.replace(/```json|```/gi, '').trim();
+      const start = clean.indexOf('[');
+      const end = clean.lastIndexOf(']');
+      if (start !== -1 && end !== -1) {
+        parsed = JSON.parse(clean.substring(start, end + 1));
+      }
+    } catch { /* continue */ }
+
+    // Try 2: extract using regex if Try 1 failed
+    if (!parsed) {
+      try {
+        const match = response.match(/\[[\s\S]*\]/);
+        if (match) {
+          parsed = JSON.parse(match[0]);
+        }
+      } catch { /* continue */ }
+    }
+
+    if (parsed && Array.isArray(parsed) && parsed.length > 0 && parsed[0].front && parsed[0].back) {
+      setCards(parsed);
+    } else if (retryCount < 2) {
+      setGenLoading(false);
+      setTimeout(() => generateCards(retryCount + 1), 2000);
+      return;
+    } else {
+      setError('Could not generate flashcards. Please try again.');
+    }
+  } catch (err: any) {
+    if (retryCount < 2) {
+      setGenLoading(false);
+      setTimeout(() => generateCards(retryCount + 1), 2000);
+      return;
+    }
+    setError('Something went wrong. Please try again.');
+    console.error(err);
+  } finally {
+    setGenLoading(false);
+  }
+};
 
   const saveCards = async () => {
     if (!cards.length || !selectedExam) return;

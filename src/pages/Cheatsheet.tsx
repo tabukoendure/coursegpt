@@ -3,6 +3,7 @@ import { Zap, Sparkles, Loader2, Share2, RefreshCw, Moon, BookOpen } from 'lucid
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { askGemini } from '../lib/gemini';
+import Markdown from 'react-markdown';
 
 export default function Cheatsheet() {
   const [exams, setExams] = React.useState<any[]>([]);
@@ -11,9 +12,7 @@ export default function Cheatsheet() {
   const [loading, setLoading] = React.useState(true);
   const [genLoading, setGenLoading] = React.useState(false);
 
-  React.useEffect(() => {
-    fetchExams();
-  }, []);
+  React.useEffect(() => { fetchExams(); }, []);
 
   const fetchExams = async () => {
     try {
@@ -40,24 +39,24 @@ export default function Cheatsheet() {
     try {
       const prompt = `You are helping a Nigerian university student at Achievers University who has ONLY 30 MINUTES before their ${selectedExam.course_code} (${selectedExam.course_name}) exam tomorrow.
 
-Generate a "Last 30 Minutes Cheatsheet" that includes ONLY the most critical information:
+Generate a "Last 30 Minutes Cheatsheet" using proper markdown formatting:
 
-🔥 TOP 5 MUST-KNOW TOPICS
-List the 5 topics most likely to appear in the exam. One line each. Be very specific.
+## 🔥 Top 5 Must-Know Topics
+List the 5 topics most likely to appear. Be very specific.
 
-⚡ CRITICAL DEFINITIONS (max 6)
-Only the definitions that WILL appear in the exam. Format: TERM → definition
+## ⚡ Critical Definitions
+Only definitions that WILL appear. Format: **TERM** — definition (max 6)
 
-🧠 KEY FORMULAS / RULES (if applicable)
-Only essential formulas or rules. Skip if not relevant.
+## 🧠 Key Formulas / Rules
+Only essential formulas or rules. Skip section if not relevant.
 
-📌 EXAMINER FAVOURITE QUESTIONS (3 questions)
+## 📌 Examiner Favourite Questions
 The 3 questions that appear almost every year with a one-line answer each.
 
-✅ LAST-MINUTE TIPS (3 tips)
+## ✅ Last-Minute Tips
 3 specific exam tips for this course.
 
-Keep it SHORT, PUNCHY and SCANNABLE. A student should be able to read this in 5 minutes. No waffle. Nigerian university context.`;
+Keep it SHORT and SCANNABLE. Use **bold** for key terms. Nigerian university context.`;
 
       const response = await askGemini(prompt, selectedExam.course_code);
       setCheatsheet(response);
@@ -89,15 +88,11 @@ Keep it SHORT, PUNCHY and SCANNABLE. A student should be able to read this in 5 
 
   return (
     <div className="space-y-8">
-
-      {/* Header */}
       <header>
         <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight flex items-center gap-3">
           <Moon className="h-7 w-7 text-primary" /> Exam Night Cheatsheet
         </h1>
-        <p className="text-sm text-text-secondary mt-1 font-medium">
-          The only thing you need to read in your last 30 minutes before the exam.
-        </p>
+        <p className="text-sm text-text-secondary mt-1 font-medium">The only thing you need to read in your last 30 minutes before the exam.</p>
       </header>
 
       {exams.length === 0 ? (
@@ -107,14 +102,10 @@ Keep it SHORT, PUNCHY and SCANNABLE. A student should be able to read this in 5 
           </div>
           <h3 className="text-xl font-black text-text-primary mb-2">No exams added yet</h3>
           <p className="text-sm text-text-secondary mb-6">Go to the Study Planner and add your exams first.</p>
-          <a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">
-            Go to Planner
-          </a>
+          <a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">Go to Planner</a>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* Left — Exam Picker */}
           <div className="lg:col-span-1 space-y-4">
             <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm">
               <h2 className="text-xs font-black text-text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -131,18 +122,10 @@ Keep it SHORT, PUNCHY and SCANNABLE. A student should be able to read this in 5 
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>
-                            {exam.course_code}
-                          </div>
-                          <div className={`text-[10px] font-medium mt-0.5 truncate max-w-[140px] ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>
-                            {exam.course_name || 'Achievers Course'}
-                          </div>
+                          <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
+                          <div className={`text-[10px] font-medium mt-0.5 truncate max-w-[140px] ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Achievers Course'}</div>
                         </div>
-                        <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase ${
-                          days <= 1 ? 'bg-error text-white' :
-                          days <= 3 ? 'bg-orange-100 text-orange-600' :
-                          selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-bg text-text-secondary border border-border'
-                        }`}>
+                        <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase ${days <= 1 ? 'bg-error text-white' : days <= 3 ? 'bg-orange-100 text-orange-600' : selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-bg text-text-secondary border border-border'}`}>
                           {days === 0 ? 'TODAY' : days === 1 ? 'TOMORROW' : `${days}d`}
                         </span>
                       </div>
@@ -150,45 +133,28 @@ Keep it SHORT, PUNCHY and SCANNABLE. A student should be able to read this in 5 
                   );
                 })}
               </div>
-
               <button
                 onClick={generateCheatsheet}
                 disabled={genLoading || !selectedExam}
                 className="w-full mt-6 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/10 disabled:opacity-50"
               >
-                {genLoading
-                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
-                  : <><Sparkles className="h-4 w-4" /> {cheatsheet ? 'Regenerate' : 'Generate Cheatsheet'}</>
-                }
+                {genLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</> : <><Sparkles className="h-4 w-4" /> {cheatsheet ? 'Regenerate' : 'Generate Cheatsheet'}</>}
               </button>
             </div>
 
-            {/* Urgency card */}
             {selectedExam && getDaysUntil(selectedExam.exam_date) <= 3 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-error/10 border border-error/20 rounded-2xl p-4 text-center"
-              >
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-error/10 border border-error/20 rounded-2xl p-4 text-center">
                 <div className="text-error font-black text-sm mb-1">
-                  {getDaysUntil(selectedExam.exam_date) === 0 ? '⚠️ Exam is TODAY!' :
-                   getDaysUntil(selectedExam.exam_date) === 1 ? '🌙 Exam is TOMORROW!' :
-                   `⏰ Only ${getDaysUntil(selectedExam.exam_date)} days left!`}
+                  {getDaysUntil(selectedExam.exam_date) === 0 ? '⚠️ Exam is TODAY!' : getDaysUntil(selectedExam.exam_date) === 1 ? '🌙 Exam is TOMORROW!' : `⏰ Only ${getDaysUntil(selectedExam.exam_date)} days left!`}
                 </div>
                 <p className="text-[10px] text-error/80 font-bold">Generate your cheatsheet now!</p>
               </motion.div>
             )}
           </div>
 
-          {/* Right — Cheatsheet Display */}
           <div className="lg:col-span-2">
             {cheatsheet ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-[2rem] border border-border shadow-sm overflow-hidden"
-              >
-                {/* Header */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-[2rem] border border-border shadow-sm overflow-hidden">
                 <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-6 flex items-center justify-between">
                   <div>
                     <div className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-2">
@@ -204,27 +170,16 @@ Keep it SHORT, PUNCHY and SCANNABLE. A student should be able to read this in 5 
                     </div>
                   </div>
                 </div>
-
-                {/* Content */}
                 <div className="p-6 md:p-8">
-                  <div className="whitespace-pre-wrap text-sm text-text-primary font-medium leading-relaxed">
-                    {cheatsheet}
+                  <div className="prose prose-sm max-w-none prose-headings:font-black prose-headings:text-text-primary prose-headings:tracking-tight prose-p:text-text-secondary prose-p:font-medium prose-strong:text-text-primary prose-li:text-text-secondary prose-li:font-medium prose-h2:text-lg prose-h2:mt-6 prose-h2:mb-3">
+                    <Markdown>{cheatsheet}</Markdown>
                   </div>
                 </div>
-
-                {/* Actions */}
                 <div className="p-6 border-t border-border flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={shareToWhatsApp}
-                    className="flex-1 py-4 bg-green-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-green-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
-                  >
+                  <button onClick={shareToWhatsApp} className="flex-1 py-4 bg-green-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-green-600 transition-all flex items-center justify-center gap-2">
                     <Share2 className="h-4 w-4" /> Share to WhatsApp
                   </button>
-                  <button
-                    onClick={generateCheatsheet}
-                    disabled={genLoading}
-                    className="flex-1 py-4 bg-bg border border-border text-text-primary font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-white transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
+                  <button onClick={generateCheatsheet} disabled={genLoading} className="flex-1 py-4 bg-bg border border-border text-text-primary font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-white transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                     <RefreshCw className="h-4 w-4" /> Regenerate
                   </button>
                 </div>
@@ -254,9 +209,7 @@ Keep it SHORT, PUNCHY and SCANNABLE. A student should be able to read this in 5 
                       </div>
                       <div>
                         <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Exam Night Ready?</h3>
-                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">
-                          Select your exam and generate your last 30 minutes survival guide.
-                        </p>
+                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">Select your exam and generate your last 30 minutes survival guide.</p>
                       </div>
                     </motion.div>
                   )}

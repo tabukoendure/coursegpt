@@ -1,8 +1,9 @@
 import React from 'react';
-import { FileText, Sparkles, Loader2, Share2, RefreshCw, BookOpen, ChevronDown } from 'lucide-react';
+import { FileText, Sparkles, Loader2, Share2, RefreshCw, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { askGemini } from '../lib/gemini';
+import Markdown from 'react-markdown';
 
 export default function SummaryGenerator() {
   const [exams, setExams] = React.useState<any[]>([]);
@@ -11,9 +12,7 @@ export default function SummaryGenerator() {
   const [loading, setLoading] = React.useState(true);
   const [genLoading, setGenLoading] = React.useState(false);
 
-  React.useEffect(() => {
-    fetchExams();
-  }, []);
+  React.useEffect(() => { fetchExams(); }, []);
 
   const fetchExams = async () => {
     try {
@@ -25,8 +24,8 @@ export default function SummaryGenerator() {
         .eq('user_id', user.id)
         .order('exam_date', { ascending: true });
       const withPdf = (data || []).filter((e: any) => e.pdf_url);
-setExams(withPdf);
-if (withPdf.length > 0) setSelectedExam(withPdf[0]);
+      setExams(withPdf);
+      if (withPdf.length > 0) setSelectedExam(withPdf[0]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -38,10 +37,12 @@ if (withPdf.length > 0) setSelectedExam(withPdf[0]);
     try {
       const res = await fetch(pdfUrl);
       const arrayBuffer = await res.arrayBuffer();
-      const base64 = btoa(
-        new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
-      return base64;
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
     } catch {
       return '';
     }
@@ -51,41 +52,60 @@ if (withPdf.length > 0) setSelectedExam(withPdf[0]);
     if (!selectedExam) return;
     setGenLoading(true);
     setSummary('');
-
     try {
       let prompt = '';
-
       if (selectedExam.pdf_url) {
         const pdfBase64 = await fetchPdfText(selectedExam.pdf_url);
         prompt = `You are helping a Nigerian university student at Achievers University prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}.
 
-Based on the course material provided, generate a comprehensive 1-page exam-focused summary that includes:
+Based on the course material provided, generate a comprehensive exam-focused summary using proper markdown formatting:
 
-1. 📌 COURSE OVERVIEW — What this course is about in 2-3 sentences
-2. 🔑 KEY CONCEPTS (at least 8-10) — The most important topics with clear explanations
-3. 📝 MUST-KNOW DEFINITIONS — At least 8 key terms and their definitions
-4. ⚡ LIKELY EXAM TOPICS — Top 5 topics most likely to appear in the exam with why
-5. 🧠 QUICK FORMULAS / RULES — Any important formulas, laws, or rules to memorize
-6. ✅ LAST-MINUTE CHECKLIST — 5 things to review the night before the exam
+## 📌 Course Overview
+2-3 sentences about what this course covers.
 
-Make it detailed, specific to Nigerian university exam patterns, and easy to screenshot and share.
+## 🔑 Key Concepts
+List at least 8-10 most important topics with clear explanations. Use **bold** for key terms.
+
+## 📝 Must-Know Definitions
+At least 8 key terms and definitions. Format: **TERM** — definition
+
+## ⚡ Likely Exam Topics
+Top 5 topics most likely to appear with reasons. Use numbered list.
+
+## 🧠 Quick Formulas / Rules
+Important formulas or rules to memorize. Skip if not relevant.
+
+## ✅ Last-Minute Checklist
+5 things to review the night before the exam.
+
+Use proper markdown: ## for headings, **bold** for important terms, - for bullet points, 1. for numbered lists.
 
 PDF Content (base64): ${pdfBase64.substring(0, 3000)}`;
       } else {
         prompt = `You are helping a Nigerian university student at Achievers University prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.
 
-Generate a comprehensive 1-page exam-focused summary that includes:
+Generate a comprehensive exam-focused summary using proper markdown formatting:
 
-1. 📌 COURSE OVERVIEW — What this course is about in 2-3 sentences
-2. 🔑 KEY CONCEPTS (at least 8-10) — The most important topics with clear explanations
-3. 📝 MUST-KNOW DEFINITIONS — At least 8 key terms and their definitions
-4. ⚡ LIKELY EXAM TOPICS — Top 5 topics most likely to appear in the exam with why
-5. 🧠 QUICK FORMULAS / RULES — Any important formulas, laws, or rules to memorize
-6. ✅ LAST-MINUTE CHECKLIST — 5 things to review the night before the exam
+## 📌 Course Overview
+2-3 sentences about what this course covers.
 
-Make it detailed, specific to Nigerian university exam patterns, and easy to screenshot and share.`;
+## 🔑 Key Concepts
+List at least 8-10 most important topics with clear explanations. Use **bold** for key terms.
+
+## 📝 Must-Know Definitions
+At least 8 key terms and definitions. Format: **TERM** — definition
+
+## ⚡ Likely Exam Topics
+Top 5 topics most likely to appear with reasons. Use numbered list.
+
+## 🧠 Quick Formulas / Rules
+Important formulas or rules to memorize. Skip if not relevant.
+
+## ✅ Last-Minute Checklist
+5 things to review the night before the exam.
+
+Use proper markdown: ## for headings, **bold** for important terms, - for bullet points, 1. for numbered lists.`;
       }
-
       const response = await askGemini(prompt, selectedExam.course_code);
       setSummary(response);
     } catch (err) {
@@ -110,13 +130,9 @@ Make it detailed, specific to Nigerian university exam patterns, and easy to scr
 
   return (
     <div className="space-y-8">
-
-      {/* Header */}
       <header>
         <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight">Summary Generator</h1>
-        <p className="text-sm text-text-secondary mt-1 font-medium">
-          Get a 1-page exam-focused summary from your course PDF. Screenshot & share.
-        </p>
+        <p className="text-sm text-text-secondary mt-1 font-medium">Get a 1-page exam-focused summary from your course PDF.</p>
       </header>
 
       {exams.length === 0 ? (
@@ -124,16 +140,14 @@ Make it detailed, specific to Nigerian university exam patterns, and easy to scr
           <div className="h-20 w-20 bg-bg rounded-[2rem] flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-border">
             <BookOpen className="h-10 w-10 text-text-secondary opacity-20" />
           </div>
-       <h3 className="text-xl font-black text-text-primary mb-2">No PDF uploaded yet</h3>
-<p className="text-sm text-text-secondary mb-6">Summary Generator only works with exams that have a PDF uploaded. Go to the Study Planner and upload a PDF for your exam.</p>
-<a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">
-  Go to Planner → Upload PDF
-</a>
+          <h3 className="text-xl font-black text-text-primary mb-2">No PDF uploaded yet</h3>
+          <p className="text-sm text-text-secondary mb-6">Go to the Study Planner and upload a PDF for your exam.</p>
+          <a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">
+            Go to Planner → Upload PDF
+          </a>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-          {/* Left — Exam Picker */}
           <div className="lg:col-span-1 space-y-4">
             <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm">
               <h2 className="text-xs font-black text-text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -148,83 +162,47 @@ Make it detailed, specific to Nigerian university exam patterns, and easy to scr
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>
-                          {exam.course_code}
-                        </div>
-                        <div className={`text-[10px] font-medium mt-0.5 truncate max-w-[160px] ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>
-                          {exam.course_name || 'Achievers Course'}
-                        </div>
+                        <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
+                        <div className={`text-[10px] font-medium mt-0.5 truncate max-w-[160px] ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Achievers Course'}</div>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        {exam.pdf_url && (
-                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>
-                            PDF ✓
-                          </span>
-                        )}
-                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-bg text-text-secondary border border-border'}`}>
-                          {exam.difficulty}
-                        </span>
-                      </div>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>PDF ✓</span>
                     </div>
                   </button>
                 ))}
               </div>
-
               <button
                 onClick={generateSummary}
                 disabled={genLoading || !selectedExam}
                 className="w-full mt-6 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/10 disabled:opacity-50"
               >
-                {genLoading
-                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
-                  : <><Sparkles className="h-4 w-4" /> {summary ? 'Regenerate' : 'Generate Summary'}</>
-                }
+                {genLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</> : <><Sparkles className="h-4 w-4" /> {summary ? 'Regenerate' : 'Generate Summary'}</>}
               </button>
             </div>
           </div>
 
-          {/* Right — Summary Display */}
           <div className="lg:col-span-2">
             {summary ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-[2rem] border border-border shadow-sm overflow-hidden"
-              >
-                {/* Summary Header */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-[2rem] border border-border shadow-sm overflow-hidden">
                 <div className="bg-primary p-6 flex items-center justify-between">
                   <div>
                     <div className="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Exam Summary</div>
                     <h2 className="text-white font-black text-xl tracking-tight">{selectedExam?.course_code}</h2>
                     <p className="text-white/70 text-xs font-medium mt-0.5">{selectedExam?.course_name}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="bg-white/20 px-3 py-1 rounded-xl text-white text-[10px] font-black uppercase tracking-widest">
-                      {new Date(selectedExam?.exam_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </div>
+                  <div className="bg-white/20 px-3 py-1 rounded-xl text-white text-[10px] font-black uppercase tracking-widest">
+                    {new Date(selectedExam?.exam_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </div>
                 </div>
-
-                {/* Summary Content */}
                 <div className="p-6 md:p-8">
-                  <div className="whitespace-pre-wrap text-sm text-text-primary font-medium leading-relaxed">
-                    {summary}
+                  <div className="prose prose-sm max-w-none prose-headings:font-black prose-headings:text-text-primary prose-headings:tracking-tight prose-p:text-text-secondary prose-p:font-medium prose-strong:text-text-primary prose-li:text-text-secondary prose-li:font-medium prose-h2:text-lg prose-h2:mt-6 prose-h2:mb-3">
+                    <Markdown>{summary}</Markdown>
                   </div>
                 </div>
-
-                {/* Action Buttons */}
                 <div className="p-6 border-t border-border flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={shareToWhatsApp}
-                    className="flex-1 py-4 bg-green-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-green-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-500/20"
-                  >
+                  <button onClick={shareToWhatsApp} className="flex-1 py-4 bg-green-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-green-600 transition-all flex items-center justify-center gap-2">
                     <Share2 className="h-4 w-4" /> Share to WhatsApp
                   </button>
-                  <button
-                    onClick={generateSummary}
-                    disabled={genLoading}
-                    className="flex-1 py-4 bg-bg border border-border text-text-primary font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-white transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
+                  <button onClick={generateSummary} disabled={genLoading} className="flex-1 py-4 bg-bg border border-border text-text-primary font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-white transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                     <RefreshCw className="h-4 w-4" /> Regenerate
                   </button>
                 </div>
@@ -239,7 +217,7 @@ Make it detailed, specific to Nigerian university exam patterns, and easy to scr
                       </div>
                       <div>
                         <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Building your summary...</h3>
-                        <p className="text-text-secondary text-sm font-medium">Reading your course material and extracting key exam topics.</p>
+                        <p className="text-text-secondary text-sm font-medium">Reading your PDF and extracting key exam topics.</p>
                       </div>
                       <div className="flex space-x-2">
                         <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
@@ -254,9 +232,7 @@ Make it detailed, specific to Nigerian university exam patterns, and easy to scr
                       </div>
                       <div>
                         <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Ready to summarize</h3>
-                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">
-                          Select an exam on the left and click Generate Summary to get your 1-page cheatsheet.
-                        </p>
+                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">Select an exam and click Generate Summary.</p>
                       </div>
                     </motion.div>
                   )}
