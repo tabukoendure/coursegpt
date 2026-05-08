@@ -20,14 +20,13 @@ export default function Planner() {
   const [examPdf, setExamPdf] = React.useState<File | null>(null);
   const [plan, setPlan] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
+  const [addLoading, setAddLoading] = React.useState(false);
   const [genLoading, setGenLoading] = React.useState(false);
   const [completedTasks, setCompletedTasks] = React.useState<number[]>([]);
   const [aiModal, setAiModal] = React.useState<{ open: boolean; topic: string; response: string; loading: boolean }>({ open: false, topic: '', response: '', loading: false });
   const [menuOpen, setMenuOpen] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    fetchUserData();
-  }, []);
+  React.useEffect(() => { fetchUserData(); }, []);
 
   React.useEffect(() => {
     const handleClick = () => setMenuOpen(null);
@@ -83,40 +82,47 @@ export default function Planner() {
 
   const addExam = async () => {
     if (!newExam.code || !newExam.date) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    setAddLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setAddLoading(false); return; }
 
-    let pdf_url = '';
-    if (examPdf) {
-      const filePath = `exam-pdfs/${user.id}/${newExam.code.toUpperCase()}_${Date.now()}.pdf`;
-      const { error: uploadError } = await supabase.storage
-        .from('past-questions')
-        .upload(filePath, examPdf);
-      if (!uploadError) {
-        const { data: { publicUrl } } = supabase.storage
+      let pdf_url = '';
+      if (examPdf) {
+        const filePath = `exam-pdfs/${user.id}/${newExam.code.toUpperCase()}_${Date.now()}.pdf`;
+        const { error: uploadError } = await supabase.storage
           .from('past-questions')
-          .getPublicUrl(filePath);
-        pdf_url = publicUrl;
+          .upload(filePath, examPdf);
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('past-questions')
+            .getPublicUrl(filePath);
+          pdf_url = publicUrl;
+        }
       }
-    }
 
-    const { data, error } = await supabase
-      .from('user_exams')
-      .insert([{
-        user_id: user.id,
-        course_code: newExam.code.toUpperCase(),
-        course_name: newExam.name,
-        exam_date: newExam.date,
-        difficulty: newExam.difficulty,
-        pdf_url,
-      }])
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from('user_exams')
+        .insert([{
+          user_id: user.id,
+          course_code: newExam.code.toUpperCase(),
+          course_name: newExam.name,
+          exam_date: newExam.date,
+          difficulty: newExam.difficulty,
+          pdf_url,
+        }])
+        .select()
+        .single();
 
-    if (!error && data) {
-      setExams([...exams, data]);
-      setNewExam({ code: '', name: '', date: '', difficulty: 'Medium' });
-      setExamPdf(null);
+      if (!error && data) {
+        setExams(prev => [...prev, data]);
+        setNewExam({ code: '', name: '', date: '', difficulty: 'Medium' });
+        setExamPdf(null);
+      }
+    } catch (err) {
+      console.error('Add exam error:', err);
+    } finally {
+      setAddLoading(false);
     }
   };
 
@@ -134,7 +140,9 @@ export default function Planner() {
     if (!user) return;
 
     const today = new Date().toISOString().split('T')[0];
-    const examList = examsWithPdf.map(e => `${e.course_code} (${e.course_name}) on ${e.exam_date} (Difficulty: ${e.difficulty})`).join(', ');
+    const examList = examsWithPdf.map(e =>
+      `${e.course_code} (${e.course_name}) on ${e.exam_date} (Difficulty: ${e.difficulty})`
+    ).join(', ');
 
     const prompt = `Create a detailed daily study plan for a Nigerian university student at Achievers University with these upcoming exams: ${examList}. 
 Rules: 
@@ -383,10 +391,13 @@ Be specific, practical and encouraging.`;
 
               <button
                 onClick={addExam}
-                disabled={!newExam.code || !newExam.date}
+                disabled={!newExam.code || !newExam.date || addLoading}
                 className="w-full py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center shadow-xl shadow-primary/10 disabled:opacity-50"
               >
-                Add to Calendar
+                {addLoading
+                  ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...</>
+                  : 'Add to Calendar'
+                }
               </button>
             </div>
           </div>
