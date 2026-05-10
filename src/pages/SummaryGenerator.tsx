@@ -1,8 +1,9 @@
 import React from 'react';
-import { FileText, Sparkles, Loader2, Share2, RefreshCw, BookOpen } from 'lucide-react';
+import { FileText, Sparkles, Loader2, Share2, RefreshCw, BookOpen, FileUp, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { askGemini } from '../lib/gemini';
+import { extractTextFromFile } from '../lib/pdfExtract';
 import Markdown from 'react-markdown';
 
 export default function SummaryGenerator() {
@@ -11,6 +12,9 @@ export default function SummaryGenerator() {
   const [summary, setSummary] = React.useState<string>('');
   const [loading, setLoading] = React.useState(true);
   const [genLoading, setGenLoading] = React.useState(false);
+  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
+  const [pdfText, setPdfText] = React.useState('');
+  const [pdfLoading, setPdfLoading] = React.useState(false);
 
   React.useEffect(() => { fetchExams(); }, []);
 
@@ -19,13 +23,10 @@ export default function SummaryGenerator() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
-        .from('user_exams')
-        .select('*')
-        .eq('user_id', user.id)
+        .from('user_exams').select('*').eq('user_id', user.id)
         .order('exam_date', { ascending: true });
-      const withPdf = (data || []).filter((e: any) => e.pdf_url);
-      setExams(withPdf);
-      if (withPdf.length > 0) setSelectedExam(withPdf[0]);
+      setExams(data || []);
+      if (data && data.length > 0) setSelectedExam(data[0]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -33,18 +34,17 @@ export default function SummaryGenerator() {
     }
   };
 
-  const fetchPdfText = async (pdfUrl: string): Promise<string> => {
+  const handlePdfUpload = async (file: File) => {
+    setPdfFile(file);
+    setPdfLoading(true);
+    setPdfText('');
     try {
-      const res = await fetch(pdfUrl);
-      const arrayBuffer = await res.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return btoa(binary);
-    } catch {
-      return '';
+      const { text } = await extractTextFromFile(file);
+      setPdfText(text);
+    } catch (err) {
+      console.error('PDF read error:', err);
+    } finally {
+      setPdfLoading(false);
     }
   };
 
@@ -53,59 +53,48 @@ export default function SummaryGenerator() {
     setGenLoading(true);
     setSummary('');
     try {
-      let prompt = '';
-      if (selectedExam.pdf_url) {
-        const pdfBase64 = await fetchPdfText(selectedExam.pdf_url);
-        prompt = `You are helping a Nigerian university student at Achievers University prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}.
+      const hasPdf = pdfText.length > 100;
+      const prompt = hasPdf
+        ? `You are helping a Nigerian university student at Achievers University prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}.
 
-Based on the course material provided, generate a comprehensive exam-focused summary using proper markdown formatting:
+Generate a comprehensive exam-focused summary STRICTLY based on the following course material only:
 
-## 📌 Course Overview
-2-3 sentences about what this course covers.
+"""
+${pdfText.substring(0, 4000)}
+"""
 
-## 🔑 Key Concepts
-List at least 8-10 most important topics with clear explanations. Use **bold** for key terms.
-
-## 📝 Must-Know Definitions
-At least 8 key terms and definitions. Format: **TERM** — definition
-
-## ⚡ Likely Exam Topics
-Top 5 topics most likely to appear with reasons. Use numbered list.
-
-## 🧠 Quick Formulas / Rules
-Important formulas or rules to memorize. Skip if not relevant.
-
-## ✅ Last-Minute Checklist
-5 things to review the night before the exam.
-
-Use proper markdown: ## for headings, **bold** for important terms, - for bullet points, 1. for numbered lists.
-
-PDF Content (base64): ${pdfBase64.substring(0, 3000)}`;
-      } else {
-        prompt = `You are helping a Nigerian university student at Achievers University prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.
-
-Generate a comprehensive exam-focused summary using proper markdown formatting:
+Use proper markdown formatting:
 
 ## 📌 Course Overview
-2-3 sentences about what this course covers.
+2-3 sentences about what this course covers based on the material above.
 
 ## 🔑 Key Concepts
-List at least 8-10 most important topics with clear explanations. Use **bold** for key terms.
+List at least 8-10 most important topics from the material. Use **bold** for key terms.
 
 ## 📝 Must-Know Definitions
-At least 8 key terms and definitions. Format: **TERM** — definition
+At least 8 key terms and definitions from the material. Format: **TERM** — definition
 
 ## ⚡ Likely Exam Topics
-Top 5 topics most likely to appear with reasons. Use numbered list.
+Top 5 topics from this material most likely to appear in the exam.
 
 ## 🧠 Quick Formulas / Rules
-Important formulas or rules to memorize. Skip if not relevant.
+Important formulas or rules from the material. Skip if not in the material.
 
 ## ✅ Last-Minute Checklist
-5 things to review the night before the exam.
+5 things to review based on this material.`
+        : `You are helping a Nigerian university student at Achievers University prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.
 
-Use proper markdown: ## for headings, **bold** for important terms, - for bullet points, 1. for numbered lists.`;
-      }
+Generate a comprehensive exam-focused summary using proper markdown:
+
+## 📌 Course Overview
+## 🔑 Key Concepts
+## 📝 Must-Know Definitions
+## ⚡ Likely Exam Topics
+## 🧠 Quick Formulas / Rules
+## ✅ Last-Minute Checklist
+
+Use **bold** for key terms, - for bullets, 1. for numbered lists.`;
+
       const response = await askGemini(prompt, selectedExam.course_code);
       setSummary(response);
     } catch (err) {
@@ -132,7 +121,7 @@ Use proper markdown: ## for headings, **bold** for important terms, - for bullet
     <div className="space-y-8">
       <header>
         <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight">Summary Generator</h1>
-        <p className="text-sm text-text-secondary mt-1 font-medium">Get a 1-page exam-focused summary from your course PDF.</p>
+        <p className="text-sm text-text-secondary mt-1 font-medium">Upload your course PDF and get a 1-page exam-focused summary.</p>
       </header>
 
       {exams.length === 0 ? (
@@ -140,41 +129,57 @@ Use proper markdown: ## for headings, **bold** for important terms, - for bullet
           <div className="h-20 w-20 bg-bg rounded-[2rem] flex items-center justify-center mx-auto mb-6 border-2 border-dashed border-border">
             <BookOpen className="h-10 w-10 text-text-secondary opacity-20" />
           </div>
-          <h3 className="text-xl font-black text-text-primary mb-2">No PDF uploaded yet</h3>
-          <p className="text-sm text-text-secondary mb-6">Go to the Study Planner and upload a PDF for your exam.</p>
-          <a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">
-            Go to Planner → Upload PDF
-          </a>
+          <h3 className="text-xl font-black text-text-primary mb-2">No exams added yet</h3>
+          <p className="text-sm text-text-secondary mb-6">Go to the Study Planner and add your exams first.</p>
+          <a href="/dashboard/planner" className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all">Go to Planner</a>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm">
-              <h2 className="text-xs font-black text-text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" /> Select Exam
-              </h2>
-              <div className="space-y-2">
-                {exams.map(exam => (
-                  <button
-                    key={exam.id}
-                    onClick={() => { setSelectedExam(exam); setSummary(''); }}
-                    className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedExam?.id === exam.id ? 'bg-primary text-white border-primary' : 'bg-bg border-border hover:border-primary/40'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
-                        <div className={`text-[10px] font-medium mt-0.5 truncate max-w-[160px] ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Achievers Course'}</div>
+            <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm space-y-5">
+
+              {/* PDF Upload */}
+              <div>
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Upload Course PDF</label>
+                <label className={`flex items-center gap-3 w-full px-4 py-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${pdfFile ? pdfLoading ? 'border-primary/40 bg-primary/5' : 'border-success bg-success/5' : 'border-border bg-bg hover:border-primary'}`}>
+                  <input type="file" accept=".pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f && f.type === 'application/pdf') handlePdfUpload(f); }} />
+                  {pdfLoading ? (
+                    <><Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" /><span className="text-xs font-black text-primary uppercase tracking-widest">Reading PDF...</span></>
+                  ) : pdfFile ? (
+                    <>
+                      <FileText className="h-4 w-4 text-success shrink-0" />
+                      <div className="flex-1 overflow-hidden">
+                        <p className="text-xs font-black text-success uppercase tracking-widest truncate">{pdfFile.name}</p>
+                        <p className="text-[10px] text-success/70 mt-0.5">{pdfText.length > 0 ? `✓ Ready` : 'Processing...'}</p>
                       </div>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>PDF ✓</span>
-                    </div>
-                  </button>
-                ))}
+                      <button type="button" onClick={e => { e.preventDefault(); setPdfFile(null); setPdfText(''); }} className="p-1 hover:text-error transition-colors shrink-0"><X className="h-4 w-4" /></button>
+                    </>
+                  ) : (
+                    <><FileUp className="h-4 w-4 text-text-secondary shrink-0" /><span className="text-xs font-bold text-text-secondary">Click to upload PDF</span></>
+                  )}
+                </label>
               </div>
-              <button
-                onClick={generateSummary}
-                disabled={genLoading || !selectedExam}
-                className="w-full mt-6 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/10 disabled:opacity-50"
-              >
+
+              {/* Exam selector */}
+              <div>
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Select Exam</label>
+                <div className="space-y-2">
+                  {exams.map(exam => (
+                    <button key={exam.id} onClick={() => { setSelectedExam(exam); setSummary(''); }} className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedExam?.id === exam.id ? 'bg-primary text-white border-primary' : 'bg-bg border-border hover:border-primary/40'}`}>
+                      <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
+                      <div className={`text-[10px] font-medium mt-0.5 truncate ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Achievers Course'}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={`p-3 rounded-xl border ${pdfText ? 'bg-primary/5 border-primary/20' : 'bg-orange-50 border-orange-200'}`}>
+                <p className={`text-[10px] font-black uppercase tracking-widest ${pdfText ? 'text-primary' : 'text-orange-600'}`}>
+                  {pdfText ? '📄 Summary will be generated from your PDF' : '⚠️ Upload a PDF for an accurate summary'}
+                </p>
+              </div>
+
+              <button onClick={generateSummary} disabled={genLoading || !selectedExam || pdfLoading} className="w-full py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/10 disabled:opacity-50">
                 {genLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</> : <><Sparkles className="h-4 w-4" /> {summary ? 'Regenerate' : 'Generate Summary'}</>}
               </button>
             </div>
@@ -232,7 +237,7 @@ Use proper markdown: ## for headings, **bold** for important terms, - for bullet
                       </div>
                       <div>
                         <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Ready to summarize</h3>
-                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">Select an exam and click Generate Summary.</p>
+                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">Upload your PDF, select an exam and click Generate Summary.</p>
                       </div>
                     </motion.div>
                   )}

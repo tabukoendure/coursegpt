@@ -1,8 +1,9 @@
 import React from 'react';
-import { BookOpen, Sparkles, Loader2, RefreshCw, Share2, CheckCircle2, XCircle, ChevronRight, RotateCcw, Trophy, AlertCircle } from 'lucide-react';
+import { BookOpen, Sparkles, Loader2, RefreshCw, Share2, CheckCircle2, XCircle, ChevronRight, RotateCcw, Trophy, AlertCircle, FileText, FileUp, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { askGemini } from '../lib/gemini';
+import { extractTextFromFile } from '../lib/pdfExtract';
 
 interface MCQ {
   type: 'mcq';
@@ -40,6 +41,9 @@ export default function Quiz() {
   const [saved, setSaved] = React.useState(false);
   const [savedQuizzes, setSavedQuizzes] = React.useState<any[]>([]);
   const [activeTab, setActiveTab] = React.useState<'generate' | 'saved'>('generate');
+  const [pdfFile, setPdfFile] = React.useState<File | null>(null);
+  const [pdfText, setPdfText] = React.useState('');
+  const [pdfLoading, setPdfLoading] = React.useState(false);
 
   React.useEffect(() => { fetchData(); }, []);
 
@@ -60,25 +64,23 @@ export default function Quiz() {
     finally { setLoading(false); }
   };
 
-  const fetchPdfText = async (pdfUrl: string): Promise<string> => {
+  const handlePdfUpload = async (file: File) => {
+    setPdfFile(file);
+    setPdfLoading(true);
+    setPdfText('');
     try {
-      const res = await fetch(pdfUrl);
-      const arrayBuffer = await res.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return btoa(binary);
-    } catch {
-      return '';
+      const { text } = await extractTextFromFile(file);
+      setPdfText(text);
+    } catch (err) {
+      console.error('PDF read error:', err);
+    } finally {
+      setPdfLoading(false);
     }
   };
 
   const parseQuestions = (text: string): Question[] | null => {
     try {
       const clean = text.replace(/```json|```/gi, '').trim();
-      // Try to find JSON array
       const start = clean.indexOf('[');
       const end = clean.lastIndexOf(']');
       if (start === -1 || end === -1) return null;
@@ -112,50 +114,36 @@ export default function Quiz() {
 
     try {
       const courseContext = `${selectedExam.course_code} (${selectedExam.course_name})`;
+      const hasPdf = pdfText.length > 100;
 
-      // Always try to read PDF
-      let pdfText = '';
-      if (selectedExam.pdf_url) {
-        pdfText = await fetchPdfText(selectedExam.pdf_url);
-      }
-
-      const pdfInstruction = pdfText
-        ? `IMPORTANT: You MUST generate ALL questions strictly and ONLY from the following course material. Do NOT add anything outside this material:\n\nPDF Content (base64): ${pdfText.substring(0, 2500)}\n\n`
-        : `Generate questions based on common Nigerian university exam patterns for ${courseContext}.\n\n`;
+      const pdfInstruction = hasPdf
+        ? `You are a quiz generator. Generate ALL questions STRICTLY and ONLY from the following course material. Every question must come directly from this text:\n\n"""\n${pdfText.substring(0, 4000)}\n"""\n\n`
+        : `Generate questions based on Nigerian university exam patterns for ${courseContext}.\n\n`;
 
       let prompt = '';
 
       if (quizType === 'mcq') {
-        prompt = `${pdfInstruction}Generate exactly ${questionCount} MCQ questions for ${courseContext}. Exam date: ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.
+        prompt = `${pdfInstruction}Generate exactly ${questionCount} MCQ questions for ${courseContext}.
+${hasPdf ? 'ALL questions MUST come strictly from the course material above.' : ''}
 
-Each question MUST:
-- Come strictly from the course material above
-- Have exactly 4 options
-- Have one clearly correct answer
-
-Return ONLY this JSON array, nothing else, no backticks:
-[{"type":"mcq","question":"question here","options":["option A","option B","option C","option D"],"correctAnswer":"exact option text","explanation":"why this is correct"}]`;
+Return ONLY a valid JSON array, no explanation, no markdown, no backticks:
+[{"type":"mcq","question":"question here","options":["A text","B text","C text","D text"],"correctAnswer":"exact option text as written","explanation":"why this answer is correct"}]`;
 
       } else if (quizType === 'theory') {
-        prompt = `${pdfInstruction}Generate exactly ${questionCount} theory/essay questions for ${courseContext}. Exam date: ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.
+        prompt = `${pdfInstruction}Generate exactly ${questionCount} theory questions for ${courseContext}.
+${hasPdf ? 'ALL questions MUST come strictly from the course material above.' : ''}
 
-Each question MUST:
-- Come strictly from the course material above
-- Have a detailed model answer
-- Be exam-standard
-
-Return ONLY this JSON array, nothing else, no backticks:
+Return ONLY a valid JSON array, no explanation, no markdown, no backticks:
 [{"type":"theory","question":"question here","modelAnswer":"detailed model answer here","marks":10}]`;
 
       } else {
         const mcqCount = Math.floor(questionCount * 0.6);
         const theoryCount = questionCount - mcqCount;
-        prompt = `${pdfInstruction}Generate exactly ${mcqCount} MCQ questions and ${theoryCount} theory questions for ${courseContext}. Exam date: ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.
+        prompt = `${pdfInstruction}Generate exactly ${mcqCount} MCQ and ${theoryCount} theory questions for ${courseContext}.
+${hasPdf ? 'ALL questions MUST come strictly from the course material above.' : ''}
 
-All questions MUST come strictly from the course material above.
-
-Return ONLY this JSON array mixing both types, nothing else, no backticks:
-[{"type":"mcq","question":"question here","options":["option A","option B","option C","option D"],"correctAnswer":"exact option text","explanation":"why this is correct"},{"type":"theory","question":"question here","modelAnswer":"detailed model answer","marks":10}]`;
+Return ONLY a valid JSON array mixing both types, no explanation, no markdown, no backticks:
+[{"type":"mcq","question":"question here","options":["A text","B text","C text","D text"],"correctAnswer":"exact option text","explanation":"why correct"},{"type":"theory","question":"question here","modelAnswer":"detailed model answer","marks":10}]`;
       }
 
       const response = await askGemini(prompt, selectedExam.course_code);
@@ -281,7 +269,7 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight">Quiz</h1>
-          <p className="text-sm text-text-secondary mt-1 font-medium">Generate exam-standard quizzes from your uploaded PDF.</p>
+          <p className="text-sm text-text-secondary mt-1 font-medium">Upload your course PDF and generate exam-standard quizzes from it.</p>
         </div>
         <div className="bg-white p-1 border border-border rounded-2xl flex w-fit shadow-sm">
           <button onClick={() => setActiveTab('generate')} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'generate' ? 'bg-primary text-white shadow-lg' : 'text-text-secondary hover:bg-bg'}`}>Generate</button>
@@ -297,7 +285,7 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                 <BookOpen className="h-10 w-10 text-text-secondary opacity-20" />
               </div>
               <h3 className="text-xl font-black text-text-primary mb-2">No saved quizzes yet</h3>
-              <p className="text-sm text-text-secondary">Generate a quiz and save it to access it here anytime.</p>
+              <p className="text-sm text-text-secondary">Generate a quiz and save it to access it anytime.</p>
             </div>
           ) : savedQuizzes.map(quiz => (
             <div key={quiz.id} className="bg-white rounded-2xl border border-border p-5 flex items-center justify-between shadow-sm">
@@ -315,13 +303,45 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left — Settings */}
           <div className="lg:col-span-1 space-y-4">
             <div className="bg-white rounded-[2rem] border border-border p-6 shadow-sm space-y-5">
               <h2 className="text-xs font-black text-text-primary uppercase tracking-widest flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-primary" /> Quiz Settings
               </h2>
 
+              {/* PDF Upload */}
+              <div>
+                <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Upload Course PDF</label>
+                <label className={`flex items-center gap-3 w-full px-4 py-4 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${pdfFile ? pdfLoading ? 'border-primary/40 bg-primary/5' : 'border-success bg-success/5' : 'border-border bg-bg hover:border-primary'}`}>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    className="hidden"
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f && f.type === 'application/pdf') handlePdfUpload(f);
+                    }}
+                  />
+                  {pdfLoading ? (
+                    <><Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" /><span className="text-xs font-black text-primary uppercase tracking-widest">Reading PDF...</span></>
+                  ) : pdfFile ? (
+                    <>
+                      <FileText className="h-4 w-4 text-success shrink-0" />
+                      <div className="flex-1 overflow-hidden">
+                        <p className="text-xs font-black text-success uppercase tracking-widest truncate">{pdfFile.name}</p>
+                        <p className="text-[10px] text-success/70 mt-0.5">{pdfText.length > 0 ? `✓ ${pdfText.length} characters extracted` : 'Processing...'}</p>
+                      </div>
+                      <button type="button" onClick={e => { e.preventDefault(); setPdfFile(null); setPdfText(''); }} className="p-1 hover:text-error transition-colors shrink-0">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <><FileUp className="h-4 w-4 text-text-secondary shrink-0" /><span className="text-xs font-bold text-text-secondary">Click to upload PDF</span></>
+                  )}
+                </label>
+              </div>
+
+              {/* Exam selector */}
               <div>
                 <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Select Exam</label>
                 <div className="space-y-2">
@@ -336,13 +356,7 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                       onClick={() => { setSelectedExam(exam); setQuestions([]); setGenError(''); }}
                       className={`w-full text-left p-3 rounded-2xl border transition-all ${selectedExam?.id === exam.id ? 'bg-primary text-white border-primary' : 'bg-bg border-border hover:border-primary/40'}`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className={`font-black text-xs uppercase ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
-                        {exam.pdf_url
-                          ? <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'}`}>PDF ✓</span>
-                          : <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-error/10 text-error'}`}>No PDF</span>
-                        }
-                      </div>
+                      <div className={`font-black text-xs uppercase ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
                       <div className={`text-[10px] truncate mt-0.5 ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name}</div>
                       <div className={`text-[8px] font-black mt-1 uppercase ${selectedExam?.id === exam.id ? 'text-white/50' : 'text-text-secondary opacity-60'}`}>
                         {exam.difficulty} • {new Date(exam.exam_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
@@ -352,6 +366,7 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                 </div>
               </div>
 
+              {/* Quiz type */}
               <div>
                 <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Quiz Type</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -361,6 +376,7 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                 </div>
               </div>
 
+              {/* Question count */}
               <div>
                 <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Number of Questions</label>
                 <div className="grid grid-cols-4 gap-2">
@@ -370,17 +386,15 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                 </div>
               </div>
 
-              {selectedExam && (
-                <div className={`p-3 rounded-xl border ${selectedExam.pdf_url ? 'bg-primary/5 border-primary/20' : 'bg-error/5 border-error/20'}`}>
-                  <p className={`text-[10px] font-black uppercase tracking-widest ${selectedExam.pdf_url ? 'text-primary' : 'text-error'}`}>
-                    {selectedExam.pdf_url ? '📄 Quiz will be generated strictly from your uploaded PDF' : '⚠️ No PDF — quiz will use general knowledge. Upload a PDF for better results.'}
-                  </p>
-                </div>
-              )}
+              <div className={`p-3 rounded-xl border ${pdfText ? 'bg-primary/5 border-primary/20' : 'bg-orange-50 border-orange-200'}`}>
+                <p className={`text-[10px] font-black uppercase tracking-widest ${pdfText ? 'text-primary' : 'text-orange-600'}`}>
+                  {pdfText ? '📄 Questions will be generated strictly from your PDF' : '⚠️ Upload a PDF above for accurate questions from your course material'}
+                </p>
+              </div>
 
               <button
                 onClick={() => generateQuiz(0)}
-                disabled={genLoading || !selectedExam}
+                disabled={genLoading || !selectedExam || pdfLoading}
                 className="w-full py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/10 disabled:opacity-50"
               >
                 {genLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</> : <><Sparkles className="h-4 w-4" /> {questions.length ? 'Regenerate' : 'Generate Quiz'}</>}
@@ -410,7 +424,6 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
             </div>
           </div>
 
-          {/* Right — Quiz Display */}
           <div className="lg:col-span-2">
             {questions.length === 0 ? (
               <div className="min-h-[500px] bg-white rounded-[2rem] border border-border flex flex-col items-center justify-center text-center p-12 shadow-sm">
@@ -421,8 +434,8 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                         <Sparkles className="h-10 w-10 text-primary" />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Reading your PDF...</h3>
-                        <p className="text-text-secondary text-sm font-medium">Generating exam-standard questions from your course material.</p>
+                        <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Generating questions...</h3>
+                        <p className="text-text-secondary text-sm font-medium">Creating exam-standard questions from your course material.</p>
                       </div>
                       <div className="flex space-x-2">
                         <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
@@ -437,7 +450,7 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                       </div>
                       <div>
                         <h3 className="text-2xl font-black text-text-primary mb-2 tracking-tighter">Ready to quiz you</h3>
-                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">Pick your exam, quiz type and number of questions, then hit Generate.</p>
+                        <p className="text-text-secondary text-sm font-medium max-w-xs mx-auto">Upload your PDF, pick your exam and quiz type, then hit Generate.</p>
                       </div>
                     </motion.div>
                   )}
@@ -480,11 +493,11 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <div className="text-xs font-bold text-text-secondary p-3 bg-white rounded-xl border border-border">
+                          <div className="text-xs p-3 bg-white rounded-xl border border-border">
                             <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">Your Answer:</div>
-                            {answers[i] || 'Not answered'}
+                            <p className="text-text-secondary font-medium">{answers[i] || 'Not answered'}</p>
                           </div>
-                          <div className="text-xs font-bold p-3 bg-success/5 rounded-xl border border-success/20">
+                          <div className="text-xs p-3 bg-success/5 rounded-xl border border-success/20">
                             <div className="text-[10px] font-black text-success uppercase tracking-widest mb-1">Model Answer:</div>
                             <p className="text-text-secondary font-medium">{(q as Theory).modelAnswer}</p>
                           </div>
@@ -528,7 +541,6 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                       </span>
                       <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Question {currentIdx + 1}</span>
                     </div>
-
                     <h3 className="text-lg font-black text-text-primary mb-6 leading-tight">{currentQuestion?.question}</h3>
 
                     {currentQuestion?.type === 'mcq' ? (
@@ -577,10 +589,7 @@ Return ONLY this JSON array mixing both types, nothing else, no backticks:
                           <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">Model Answer:</div>
                           <p className="text-xs font-medium text-text-secondary">{(currentQuestion as Theory).modelAnswer}</p>
                         </div>
-                        <button
-                          onClick={handleTheoryNext}
-                          className="w-full py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
-                        >
+                        <button onClick={handleTheoryNext} className="w-full py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
                           {currentIdx === questions.length - 1 ? 'Finish Quiz' : 'Next Question'} <ChevronRight className="h-4 w-4" />
                         </button>
                       </div>
