@@ -115,16 +115,16 @@ export default function Planner() {
       `${e.course_code} (${e.course_name}) on ${e.exam_date} (Difficulty: ${e.difficulty})`
     ).join(', ');
 
-    const prompt = `Create a detailed daily study plan for a Nigerian university student at Achievers University with these upcoming exams: ${examList}.
+    const prompt = `Create a daily study schedule for a Nigerian university student at Achievers University with these upcoming exams: ${examList}.
+
 Rules:
 1) Start from today ${today}
-2) Harder subjects get more days
-3) Leave 2 days before each exam for revision only
-4) Study sessions max 2 hours per day per subject
-5) Include specific topics to cover each day based on common Nigerian university exam patterns
-6) Format as a clear day-by-day plan
-7) Format each day precisely as: "DAY [N] - [DATE]: [COURSE CODE] - [TOPIC] ([X] mins)"`;
-
+2) Harder subjects get more study days
+3) Leave 2 days before each exam for revision
+4) Max 2 hours per subject per day
+5) Format EACH day on its own line EXACTLY like this: "DAY [N] - [DATE]: [COURSE CODE] ([X] hrs)"
+6) For revision days use: "DAY [N] - [DATE]: REVISION - [COURSE CODE] ([X] hrs)"
+7) Return ONLY the day lines, nothing else, no explanation`;
     try {
       const response = await askGemini(prompt, 'Study Planning');
       const parsedDays = response
@@ -262,8 +262,7 @@ Be specific, practical and encouraging.`;
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight">Study Planner</h1>
-          <p className="text-sm text-text-secondary mt-1 font-medium">Add your exams and generate a smart AI study plan.</p>
-        </div>
+<p className="text-sm text-text-secondary mt-1 font-medium">Add your exams and generate a clean daily study schedule.</p>        </div>
         <div className="flex items-center gap-3">
           {plan && (
             <>
