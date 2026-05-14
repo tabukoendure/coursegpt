@@ -17,8 +17,11 @@ export default function DashboardOverview() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-        setProfile(p);
-
+if (!p) {
+  navigate('/onboarding');
+  return;
+}
+setProfile(p);
         const { data: pqs } = await supabase.from('past_questions').select('*').order('download_count', { ascending: false }).limit(5);
         setPopularPQs(pqs || []);
 

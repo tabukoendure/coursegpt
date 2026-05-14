@@ -84,12 +84,15 @@ export default function Onboarding() {
 
       // Update profile
       await supabase
-        .from('profiles')
-        .update({
-          level: form.level,
-          department: form.department,
-        })
-        .eq('id', user.id);
+  .from('profiles')
+  .upsert({
+    id: user.id,
+    full_name: user.user_metadata?.full_name || user.email,
+    email: user.email,
+    level: form.level,
+    department: form.department,
+    university: 'Achievers University',
+  });
 
       // Save exam dates
       if (form.examDates.length > 0) {
