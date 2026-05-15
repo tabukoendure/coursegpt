@@ -74,14 +74,20 @@ export default function Onboarding() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      await supabase.from('profiles').upsert({
-        id: user.id,
-        full_name: user.user_metadata?.full_name || user.email,
-        email: user.email,
-        level: form.level,
-        department: form.department,
-        university: 'Achievers University',
-      });
+      const { error: upsertError } = await supabase.from('profiles').upsert({
+  id: user.id,
+  full_name: user.user_metadata?.full_name || user.email,
+  email: user.email,
+  level: form.level,
+  department: form.department,
+  university: 'Achievers University',
+}, { onConflict: 'id' });
+
+if (upsertError) {
+  console.error('Profile save error:', upsertError);
+  alert('Failed to save profile: ' + upsertError.message);
+  return;
+}
 
       if (form.examDates.length > 0) {
         await supabase.from('user_exams').insert(

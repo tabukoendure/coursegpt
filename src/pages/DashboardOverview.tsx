@@ -16,7 +16,12 @@ export default function DashboardOverview() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        let p = null;
+for (let i = 0; i < 3; i++) {
+  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  if (data) { p = data; break; }
+  await new Promise(res => setTimeout(res, 1000));
+}
 if (!p) {
   navigate('/onboarding');
   return;
