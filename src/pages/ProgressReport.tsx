@@ -81,7 +81,7 @@ export default function ProgressReport() {
     setGenLoading(true);
     setReport('');
     try {
-      const prompt = `You are an encouraging but honest academic mentor for a Nigerian university student at Achievers University.
+      const prompt = `You are an encouraging but honest academic mentor for a Nigerian university student at their university.
 
 Here is their study activity this week:
 - AI Tutor sessions: ${stats.aiSessions}

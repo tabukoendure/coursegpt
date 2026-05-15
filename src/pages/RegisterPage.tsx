@@ -68,18 +68,17 @@ export default function RegisterPage() {
 
       if (authData.user) {
         const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([{
-            id: authData.user.id,
-            full_name: formData.fullName,
-            email: formData.email,
-            level: formData.level,
-            department: formData.department,
-            university: 'Achievers University',
-          }]);
+  .from('profiles')
+  .insert([{
+    id: authData.user.id,
+    full_name: formData.fullName,
+    email: formData.email,
+    level: formData.level,
+    department: formData.department,
+  }]);
 
         if (profileError) console.error('Profile error:', profileError);
-        setShowVerify(true);
+        navigate('/onboarding');
       }
     } catch (err: any) {
       if (err.message.includes('already registered')) {
@@ -145,7 +144,7 @@ export default function RegisterPage() {
       >
         <h1 className="text-3xl font-black text-text-primary mb-2 tracking-tight">Create your account</h1>
         <p className="text-text-secondary mb-8 font-medium">
-          Join the smartest students at Achievers University
+          Join thousands of Nigerian university students
         </p>
 
         {error && (
@@ -281,7 +280,7 @@ export default function RegisterPage() {
       </motion.div>
 
       <p className="mt-8 text-xs text-text-secondary opacity-40 font-bold uppercase tracking-widest">
-        Built for Achievers University, Owo
+Built for Nigerian university students
       </p>
     </div>
   );

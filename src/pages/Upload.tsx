@@ -13,6 +13,7 @@ const years = Array.from({ length: 8 }, (_, i) =>
 );
 const depts = ['Nursing Science', 'Engineering', 'Law', 'Pharmacy', 'MBBS', 'Other'];
 export default function Upload() {
+  const [userUniversity, setUserUniversity] = React.useState('');
   const [activeTab, setActiveTab] = React.useState<'form' | 'my-uploads'>('form');
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
@@ -31,6 +32,16 @@ export default function Upload() {
     if (activeTab === 'my-uploads') {
       fetchMyUploads();
     }
+    React.useEffect(() => {
+  const fetchUniversity = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.from('profiles').select('university').eq('id', user.id).maybeSingle();
+      setUserUniversity(data?.university || '');
+    }
+  };
+  fetchUniversity();
+}, []);
   }, [activeTab]);
 
   const fetchMyUploads = async () => {
@@ -74,15 +85,17 @@ export default function Upload() {
 
       const { data: { publicUrl } } = supabase.storage.from('past-questions').getPublicUrl(filePath);
       
-      const { error: dbError } = await supabase.from('past_questions').insert([{
-        course_code: formData.courseCode.toUpperCase(),
-        course_name: formData.courseName,
-        year: formData.year,
-        department: formData.department,
-        file_url: publicUrl,
-        description: formData.description,
-        uploaded_by: user.id
-      }]);
+   const { error: dbError } = await supabase.from('past_questions').insert([{
+  course_code: formData.courseCode.toUpperCase(),
+  course_name: formData.courseName,
+  year: formData.year,
+  department: formData.department,
+  university: userUniversity,
+  file_url: publicUrl,
+  description: formData.description,
+  uploaded_by: user.id
+}]);
+   
 
       if (dbError) throw dbError;
 
@@ -217,8 +230,7 @@ export default function Upload() {
                       <div className="text-center text-text-secondary">
                         <UploadIcon className="h-12 w-12 mx-auto mb-4 opacity-10 group-hover:opacity-40 group-hover:scale-110 transition-all font-black" />
                         <p className="text-sm font-black text-text-primary tracking-tight">Drop your PDF here</p>
-                        <p className="text-[10px] mt-2 font-bold opacity-60">VERIFIED ARCHIEVERS PAPERS ONLY • MAX 15MB</p>
-                      </div>
+<p className="text-[10px] mt-2 font-bold opacity-60">VERIFIED PAST QUESTIONS ONLY • MAX 15MB</p>                      </div>
                     )}
                   </label>
                 </div>
@@ -338,7 +350,7 @@ export default function Upload() {
                                 </div>
                                 <div className="truncate max-w-[200px]">
                                    <div className="font-bold text-sm tracking-tight">{upload.course_code}</div>
-                                   <div className="text-[10px] text-text-secondary truncate">{upload.course_name || 'Achievers Course'}</div>
+                                   <div className="text-[10px] text-text-secondary truncate">{upload.course_name || 'Course'}</div>
                                 </div>
                               </div>
                            </td>
@@ -369,8 +381,7 @@ export default function Upload() {
                        <FileText className="h-12 w-12" />
                     </div>
                     <p className="text-sm font-black text-text-primary mb-2">No uploads yet</p>
-                    <p className="text-xs text-text-secondary mb-8">Your contributions help Achievers students succeed.</p>
-                    <button 
+<p className="text-xs text-text-secondary mb-8">Your contributions help students at your university succeed.</p>                    <button 
                       onClick={() => setActiveTab('form')}
                       className="px-8 py-4 bg-primary text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-xl shadow-primary/20"
                     >

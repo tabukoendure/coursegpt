@@ -211,7 +211,7 @@ Return ONLY a valid JSON array, nothing else:
                   {exams.map(exam => (
                     <button key={exam.id} onClick={() => { setSelectedExam(exam); setCards([]); setCurrentIdx(0); setFlipped(false); setError(''); }} className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedExam?.id === exam.id ? 'bg-primary text-white border-primary' : 'bg-bg border-border hover:border-primary/40'}`}>
                       <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
-                      <div className={`text-[10px] font-medium mt-0.5 truncate ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Achievers Course'}</div>
+                      <div className={`text-[10px] font-medium mt-0.5 truncate ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Course'}</div>
                     </button>
                   ))}
                 </div>

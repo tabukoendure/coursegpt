@@ -16,7 +16,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="mt-4 text-text-secondary max-w-xs">
-              Study smarter with AI-powered past questions and study plans built specifically for Achievers University students.
+              Study smarter with AI-powered past questions and study plans built for Nigerian university students.
             </p>
           </div>
           <div>
@@ -37,7 +37,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-          <p className="text-sm text-text-secondary">© {new Date().getFullYear()} CourseGPT. Built for Achievers University, Nigeria.</p>
+          <p className="text-sm text-text-secondary">© 2026 CourseGPT. Built for Nigerian Universities.</p>
           <div className="flex space-x-6">
             <span className="text-sm text-text-secondary">#StudySmarter</span>
           </div>

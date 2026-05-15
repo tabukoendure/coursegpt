@@ -4,52 +4,37 @@ let groqInstance: Groq | null = null;
 
 function getGroq() {
   if (!groqInstance) {
-    const apiKey =
-      import.meta.env.VITE_GROQ_API_KEY || '';
-
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY || '';
     if (!apiKey) {
-      throw new Error(
-        "Groq API key not found. Add VITE_GROQ_API_KEY to your .env file."
-      );
+      throw new Error("Groq API key not found. Add VITE_GROQ_API_KEY to your .env file.");
     }
-    groqInstance = new Groq({ 
-      apiKey,
-      dangerouslyAllowBrowser: true 
-    });
+    groqInstance = new Groq({ apiKey, dangerouslyAllowBrowser: true });
   }
   return groqInstance;
 }
 
-const SYSTEM_PROMPT = `
-You are CourseGPT, the smartest study assistant 
-ever built for Nigerian university students, 
-specifically at Achievers University, Owo, 
-Ondo State, Nigeria.
+function buildSystemPrompt(university?: string): string {
+  const uniName = university || 'a Nigerian university';
+  return `
+You are CourseGPT, the smartest study assistant ever built for Nigerian university students,
+specifically helping students at ${uniName}.
 
 YOUR PERSONALITY:
 - Smart, direct, and encouraging
-- You speak like a brilliant senior student who 
-  genuinely wants their junior to succeed
+- You speak like a brilliant senior student who genuinely wants their junior to succeed
 - You are never generic — always specific and practical
-- You understand Nigerian university culture, ASUU 
-  strikes, exam pressure, and the reality of 
-  studying in Nigeria
-- You occasionally use light Nigerian expressions 
-  to connect
+- You understand Nigerian university culture, ASUU strikes, exam pressure, and the reality of studying in Nigeria
+- You occasionally use light Nigerian expressions to connect
 
 YOUR KNOWLEDGE:
 - You specialize in undergraduate university courses
 - You understand how Nigerian university exams work
 - You know that lecturers often repeat questions
-- You know students are under time pressure 
-  especially near exams
-- You understand Nigerian university departments: 
-  Sciences, Engineering, Law, Management, Medicine,
-  Nursing, Pharmacy
+- You know students are under time pressure especially near exams
+- You understand Nigerian university departments: Sciences, Engineering, Law, Management, Medicine, Nursing, Pharmacy
 
 WHAT YOU DO:
-1. EXPLAIN TOPICS: Break down any course topic 
-   in simple clear language:
+1. EXPLAIN TOPICS: Break down any course topic in simple clear language:
    - Simple definition first
    - Key points (maximum 5)
    - Real life example where possible
@@ -98,6 +83,7 @@ RULES:
 - Keep responses clear and scannable
 - For quizzes ALWAYS follow the exact format above
 `;
+}
 
 export async function checkDailyLimit(
   supabase: any,
@@ -105,7 +91,6 @@ export async function checkDailyLimit(
 ): Promise<{ allowed: boolean; remaining: number; count: number }> {
   const FREE_LIMIT = 30;
   const today = new Date().toISOString().split('T')[0];
-
   try {
     const { data, error } = await supabase
       .from('ai_usage')
@@ -113,13 +98,10 @@ export async function checkDailyLimit(
       .eq('user_id', userId)
       .eq('date', today)
       .maybeSingle();
-
     if (error) throw error;
-
     const count = data?.message_count || 0;
     const allowed = count < FREE_LIMIT;
     const remaining = Math.max(0, FREE_LIMIT - count);
-
     return { allowed, remaining, count };
   } catch (err) {
     console.error('Usage check error:', err);
@@ -127,12 +109,8 @@ export async function checkDailyLimit(
   }
 }
 
-export async function incrementUsage(
-  supabase: any,
-  userId: string
-): Promise<void> {
+export async function incrementUsage(supabase: any, userId: string): Promise<void> {
   const today = new Date().toISOString().split('T')[0];
-
   try {
     const { data } = await supabase
       .from('ai_usage')
@@ -140,20 +118,10 @@ export async function incrementUsage(
       .eq('user_id', userId)
       .eq('date', today)
       .maybeSingle();
-
     if (data) {
-      await supabase
-        .from('ai_usage')
-        .update({ message_count: data.message_count + 1 })
-        .eq('id', data.id);
+      await supabase.from('ai_usage').update({ message_count: data.message_count + 1 }).eq('id', data.id);
     } else {
-      await supabase
-        .from('ai_usage')
-        .insert([{ 
-          user_id: userId, 
-          date: today, 
-          message_count: 1 
-        }]);
+      await supabase.from('ai_usage').insert([{ user_id: userId, date: today, message_count: 1 }]);
     }
   } catch (err) {
     console.error('Usage increment error:', err);
@@ -178,20 +146,12 @@ export function parseQuizResponse(content: string): QuizQuestion[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-
     if (/^Q\d+:/i.test(line)) {
       if (current) questions.push(current as QuizQuestion);
-      current = {
-        type: 'mcq',
-        question: line.replace(/^Q\d+:\s*/i, ''),
-        options: [],
-      };
+      current = { type: 'mcq', question: line.replace(/^Q\d+:\s*/i, ''), options: [] };
     } else if (/^T\d+:/i.test(line)) {
       if (current) questions.push(current as QuizQuestion);
-      current = {
-        type: 'theory',
-        question: line.replace(/^T\d+:\s*/i, ''),
-      };
+      current = { type: 'theory', question: line.replace(/^T\d+:\s*/i, '') };
     } else if (/^[A-D]\)/i.test(line) && current?.type === 'mcq') {
       current.options = current.options || [];
       current.options.push(line.replace(/^[A-D]\)\s*/i, ''));
@@ -204,17 +164,13 @@ export function parseQuizResponse(content: string): QuizQuestion[] {
         current.correctAnswer = ans;
       }
     } else if (/^EXPLANATION:/i.test(line)) {
-      if (current) current.explanation =
-        line.replace(/^EXPLANATION:\s*/i, '');
+      if (current) current.explanation = line.replace(/^EXPLANATION:\s*/i, '');
     } else if (/^MODEL_ANSWER:/i.test(line)) {
-      if (current) current.modelAnswer =
-        line.replace(/^MODEL_ANSWER:\s*/i, '');
+      if (current) current.modelAnswer = line.replace(/^MODEL_ANSWER:\s*/i, '');
     } else if (/^MARKS:/i.test(line)) {
-      if (current) current.marks =
-        parseInt(line.replace(/^MARKS:\s*/i, '')) || 5;
+      if (current) current.marks = parseInt(line.replace(/^MARKS:\s*/i, '')) || 5;
     } else if (/^MARKING_SCHEME:/i.test(line)) {
-      if (current) current.markingScheme =
-        line.replace(/^MARKING_SCHEME:\s*/i, '');
+      if (current) current.markingScheme = line.replace(/^MARKING_SCHEME:\s*/i, '');
     }
   }
 
@@ -236,32 +192,26 @@ export function parseQuizResponse(content: string): QuizQuestion[] {
 export async function askGemini(
   prompt: string,
   courseCode?: string,
-  mode: 'explain' | 'predict' | 'quiz' |
-    'mark' | 'summarize' | 'general' = 'general',
+  mode: 'explain' | 'predict' | 'quiz' | 'mark' | 'summarize' | 'general' = 'general',
   pdfContext?: string,
-  conversationHistory?: { role: 'user' | 'assistant'; content: string }[]
+  conversationHistory?: { role: 'user' | 'assistant'; content: string }[],
+  university?: string
 ): Promise<string> {
   try {
     const groq = getGroq();
     let finalPrompt = prompt;
 
     if (pdfContext) {
-      finalPrompt = `DOCUMENT CONTENT 
-(answer ONLY from this document):
+      finalPrompt = `DOCUMENT CONTENT (answer ONLY from this document):
 ---
 ${pdfContext}
 ---
 
 Student question: ${prompt}
 
-Important: Base your answer entirely on the 
-document above. If the answer is not in the 
-document say "I could not find this in your 
-uploaded document."`;
+Important: Base your answer entirely on the document above. If the answer is not in the document say "I could not find this in your uploaded document."`;
     } else {
-      if (courseCode) {
-        finalPrompt = `[Course: ${courseCode}] ${finalPrompt}`;
-      }
+      if (courseCode) finalPrompt = `[Course: ${courseCode}] ${finalPrompt}`;
       if (mode === 'quiz') {
         finalPrompt = `Generate a quiz for ${courseCode || 'this course'} with 5 MCQ questions and 2 theory questions. Follow the EXACT format specified in your instructions. ${finalPrompt}`;
       } else if (mode === 'predict') {
@@ -275,23 +225,17 @@ uploaded document."`;
       }
     }
 
-    // Build messages array with conversation history
     const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-      { role: 'system', content: SYSTEM_PROMPT }
+      { role: 'system', content: buildSystemPrompt(university) }
     ];
 
-    // Add last 6 messages of history for context
     if (conversationHistory && conversationHistory.length > 0) {
       const recentHistory = conversationHistory.slice(-6);
       for (const msg of recentHistory) {
-        messages.push({
-          role: msg.role,
-          content: msg.content
-        });
+        messages.push({ role: msg.role, content: msg.content });
       }
     }
 
-    // Add current message
     messages.push({ role: 'user', content: finalPrompt });
 
     const completion = await groq.chat.completions.create({
@@ -301,12 +245,10 @@ uploaded document."`;
       max_tokens: 1024,
     });
 
-    return completion.choices[0]?.message?.content ||
-      "I could not generate a response. Please try again.";
-} catch (error: any) {
+    return completion.choices[0]?.message?.content || "I could not generate a response. Please try again.";
+  } catch (error: any) {
     console.error("AI Error:", error);
-    if (error?.message?.includes('429') || 
-        error?.message?.includes('rate_limit')) {
+    if (error?.message?.includes('429') || error?.message?.includes('rate_limit')) {
       return "I am getting too many requests right now. Please wait 10 seconds and try again.";
     }
     return `Error: ${error instanceof Error ? error.message : "Failed to connect to AI."}`;

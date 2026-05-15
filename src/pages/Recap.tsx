@@ -118,7 +118,7 @@ export default function Recap() {
       upcomingExams: upcomingExams.map(e => `${e.course_code} on ${e.exam_date}`)
     };
 
-    const prompt = `Act as a supportive and highly analytical study mentor for an Achievers University student. 
+    const prompt = `Act as a supportive and highly analytical study mentor for a Nigerian university student. 
 Based on their activity this week:
 - They had ${dataSummary.sessionsCount} AI study sessions.
 - They completed ${dataSummary.topicsCompleted} planned study topics.
@@ -131,7 +131,7 @@ Provide a "Weekly Recap" that includes:
 3. Priority areas for next week based on upcoming exams.
 4. A motivational "Nigerian student" quote or proverb to keep them going.
 
-Format the response with clean markdown headings and bullet points. Use specific Achievers context.`;
+Format the response with clean markdown headings and bullet points. Be specific and practical.`;
 
     try {
       const response = await askGemini(prompt, 'Weekly Recap');
@@ -232,7 +232,7 @@ Format the response with clean markdown headings and bullet points. Use specific
                 <div key={exam.id} className="p-4 bg-bg rounded-2xl border border-border/10 flex items-center justify-between hover:bg-orange-50/30 transition-all group">
                   <div className="truncate">
                     <div className="text-xs font-black text-text-primary group-hover:text-orange-600 transition-colors uppercase tracking-widest">{exam.course_code}</div>
-                    <div className="text-[10px] text-text-secondary font-bold truncate max-w-[140px] uppercase tracking-tighter opacity-70">{exam.course_name || 'Achievers Course'}</div>
+                    <div className="text-[10px] text-text-secondary font-bold truncate max-w-[140px] uppercase tracking-tighter opacity-70">{exam.course_name || 'Course'}</div>
                   </div>
                   <div className="text-[10px] font-black text-orange-600 bg-white border border-orange-100 px-3 py-1.5 rounded-xl shrink-0 whitespace-nowrap">
                     {new Date(exam.exam_date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
@@ -284,7 +284,7 @@ Format the response with clean markdown headings and bullet points. Use specific
                   </div>
                   <div>
                     <span className="text-[11px] font-black text-primary uppercase tracking-[0.4em] block mb-0.5">Tactical Analysis</span>
-                    <span className="text-[9px] font-bold text-text-secondary uppercase">Achievers AI Mentor v2.0</span>
+                    <span className="text-[9px] font-bold text-text-secondary uppercase">CourseGPT AI Mentor v2.0</span>
                   </div>
                 </div>
                 <div className="markdown-body prose prose-sm max-w-none prose-headings:font-black prose-headings:tracking-tight prose-headings:uppercase prose-headings:text-text-primary prose-p:font-medium prose-p:text-text-secondary text-base leading-relaxed">

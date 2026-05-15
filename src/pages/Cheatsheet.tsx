@@ -53,7 +53,7 @@ export default function Cheatsheet() {
       const hasPdf = pdfText.length > 100;
 
       const prompt = hasPdf
-        ? `You are helping a Nigerian university student at Achievers University who has ONLY 30 MINUTES before their ${selectedExam.course_code} (${selectedExam.course_name}) exam.
+        ? `You are helping a Nigerian university student at their university who has ONLY 30 MINUTES before their ${selectedExam.course_code} (${selectedExam.course_name}) exam.
 
 Generate a "Last 30 Minutes Cheatsheet" STRICTLY based on the following course material only:
 
@@ -79,7 +79,7 @@ Only essential formulas or rules from the material. Skip if not in the material.
 3 specific exam tips based on this course material.
 
 Keep it SHORT and SCANNABLE. Use **bold** for key terms.`
-        : `You are helping a Nigerian university student at Achievers University who has ONLY 30 MINUTES before their ${selectedExam.course_code} (${selectedExam.course_name}) exam.
+        : `You are helping a Nigerian university student at their university who has ONLY 30 MINUTES before their ${selectedExam.course_code} (${selectedExam.course_name}) exam.
 
 Generate a "Last 30 Minutes Cheatsheet" using proper markdown formatting:
 
@@ -188,7 +188,7 @@ Keep it SHORT and SCANNABLE. Use **bold** for key terms. Nigerian university con
                         <div className="flex items-center justify-between">
                           <div>
                             <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
-                            <div className={`text-[10px] font-medium mt-0.5 truncate max-w-[140px] ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Achievers Course'}</div>
+                            <div className={`text-[10px] font-medium mt-0.5 truncate max-w-[140px] ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Course'}</div>
                           </div>
                           <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase ${days <= 1 ? 'bg-error text-white' : days <= 3 ? 'bg-orange-100 text-orange-600' : selectedExam?.id === exam.id ? 'bg-white/20 text-white' : 'bg-bg text-text-secondary border border-border'}`}>
                             {days === 0 ? 'TODAY' : days === 1 ? 'TOMORROW' : `${days}d`}

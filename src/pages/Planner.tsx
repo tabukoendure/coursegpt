@@ -115,7 +115,7 @@ export default function Planner() {
       `${e.course_code} (${e.course_name}) on ${e.exam_date} (Difficulty: ${e.difficulty})`
     ).join(', ');
 
-    const prompt = `Create a daily study schedule for a Nigerian university student at Achievers University with these upcoming exams: ${examList}.
+    const prompt = `Create a daily study schedule for a Nigerian university student at their university with these upcoming exams: ${examList}.
 
 Rules:
 1) Start from today ${today}
@@ -174,7 +174,7 @@ Rules:
   const askAiAboutDay = async (dayLine: string) => {
     setAiModal({ open: true, topic: dayLine, response: '', loading: true });
     const topic = dayLine.split(':').slice(1).join(':').trim();
-    const prompt = `A Nigerian university student at Achievers University has this study task today: "${topic}".
+    const prompt = `A Nigerian university student at their university has this study task today: "${topic}".
 Please:
 1. Explain the key concepts for this topic in simple, clear language
 2. Give 5 likely exam questions on this topic with answers
@@ -351,7 +351,7 @@ Be specific, practical and encouraging.`;
                         {days === 0 ? 'Today' : days < 0 ? 'Ended' : `${days}d`}
                       </span>
                     </div>
-                    <div className="text-[10px] text-text-secondary font-medium truncate">{exam.course_name || 'Achievers Course'}</div>
+                    <div className="text-[10px] text-text-secondary font-medium truncate">{exam.course_name || 'Course'}</div>
                   </div>
 
                   <div className="relative">

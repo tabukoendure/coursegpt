@@ -200,7 +200,7 @@ export default function LoginPage() {
       </motion.div>
 
       <p className="mt-8 text-xs text-text-secondary opacity-40 font-bold uppercase tracking-widest">
-        Built for Achievers University, Owo
+        Built for Nigerian University Students
       </p>
     </div>
   );

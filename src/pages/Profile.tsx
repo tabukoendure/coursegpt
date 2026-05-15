@@ -113,7 +113,7 @@ export default function Profile() {
             {profile?.level} • {profile?.department}
           </p>
           <p className="text-xs text-text-secondary mt-1">
-            Achievers University, Owo
+            Your University
           </p>
         </div>
       </div>
@@ -228,7 +228,7 @@ export default function Profile() {
               <GraduationCap className="h-3 w-3" /> University
             </label>
             <p className="text-sm font-bold text-text-secondary bg-bg rounded-xl px-4 py-3">
-              Achievers University, Owo
+              Your University
             </p>
           </div>
 

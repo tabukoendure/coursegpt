@@ -35,6 +35,7 @@ interface ChatSession {
 }
 
 export default function AiTutor() {
+  const [userUniversity, setUserUniversity] = React.useState<string>('');
   const [sessions, setSessions] = React.useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -74,6 +75,8 @@ export default function AiTutor() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUser(user);
+        const { data: profile } = await supabase.from('profiles').select('university').eq('id', user.id).maybeSingle();
+setUserUniversity(profile?.university || '');
         fetchSessions(user.id);
         loadDailyLimit(user.id);
       }
@@ -266,12 +269,13 @@ export default function AiTutor() {
     setMessagesRemaining(Math.max(0, remaining - 1));
 
     try {
-      const response = await askGemini(
-        text,
-        courseCode,
-        mode,
-pdfContext || undefined,
-  messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-6).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+const response = await askGemini(
+  text,
+  courseCode,
+  mode,
+  pdfContext || undefined,
+  messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-6).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+  userUniversity
 );
       const aiMsg: ChatMessage = {
         role: 'assistant',

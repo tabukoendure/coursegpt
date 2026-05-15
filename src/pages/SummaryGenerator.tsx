@@ -55,7 +55,7 @@ export default function SummaryGenerator() {
     try {
       const hasPdf = pdfText.length > 100;
       const prompt = hasPdf
-        ? `You are helping a Nigerian university student at Achievers University prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}.
+        ? `You are helping a Nigerian university student at their university prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}.
 
 Generate a comprehensive exam-focused summary STRICTLY based on the following course material only:
 
@@ -82,7 +82,7 @@ Important formulas or rules from the material. Skip if not in the material.
 
 ## ✅ Last-Minute Checklist
 5 things to review based on this material.`
-        : `You are helping a Nigerian university student at Achievers University prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.
+        : `You are helping a Nigerian university student at their university prepare for their ${selectedExam.course_code} (${selectedExam.course_name}) exam on ${selectedExam.exam_date}. Difficulty: ${selectedExam.difficulty}.
 
 Generate a comprehensive exam-focused summary using proper markdown:
 
@@ -167,7 +167,7 @@ Use **bold** for key terms, - for bullets, 1. for numbered lists.`;
                   {exams.map(exam => (
                     <button key={exam.id} onClick={() => { setSelectedExam(exam); setSummary(''); }} className={`w-full text-left p-4 rounded-2xl border transition-all ${selectedExam?.id === exam.id ? 'bg-primary text-white border-primary' : 'bg-bg border-border hover:border-primary/40'}`}>
                       <div className={`font-black text-sm uppercase tracking-tight ${selectedExam?.id === exam.id ? 'text-white' : 'text-text-primary'}`}>{exam.course_code}</div>
-                      <div className={`text-[10px] font-medium mt-0.5 truncate ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Achievers Course'}</div>
+                      <div className={`text-[10px] font-medium mt-0.5 truncate ${selectedExam?.id === exam.id ? 'text-white/70' : 'text-text-secondary'}`}>{exam.course_name || 'Course'}</div>
                     </button>
                   ))}
                 </div>

@@ -318,7 +318,7 @@ export default function Settings() {
       <div className="text-center py-4">
         <p className="text-[10px] font-black text-text-secondary 
           uppercase tracking-widest opacity-40">
-          CourseGPT v1.0 — Built for Achievers University
+          CourseGPT v1.0 — Built for Nigerian Universities
         </p>
       </div>
     </div>

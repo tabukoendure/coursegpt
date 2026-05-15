@@ -41,7 +41,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, scale: 1 }}
             className="inline-flex items-center px-4 py-1.5 rounded-full bg-primary-light text-primary text-xs font-bold tracking-tight mb-8"
           >
-            Built for Achievers University students 🎓
+Built for Nigerian University Students 🎓
           </motion.div>
           
           <motion.h1 
@@ -148,7 +148,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-bold text-text-primary mb-3">AI Course Assistant</h3>
               <p className="text-text-secondary leading-relaxed">
-                Ask anything about your course. Get answers based on how Achievers lecturers actually teach and structure exams.
+                Ask anything about your course. Get answers tailored to how your lecturers teach and structure exams.
               </p>
             </div>
 
@@ -197,7 +197,7 @@ export default function LandingPage() {
       {/* Popular Courses */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-text-primary mb-12 text-center md:text-left">Popular at Achievers University</h2>
+          <h2 className="text-3xl font-bold text-text-primary mb-12 text-center md:text-left">Popular Courses</h2>
           <div className="flex flex-wrap gap-4 justify-center md:justify-start">
             {[
               { code: 'BCH201', name: 'General Biochemistry', count: 12 },
@@ -265,7 +265,7 @@ export default function LandingPage() {
           
           <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">Ready to pass your next exam?</h2>
           <p className="text-xl text-primary-light opacity-90 max-w-2xl mx-auto mb-10">
-            Join your fellow Achievers students already studying smarter. Start for free — no credit card needed.
+            Join thousands of Nigerian university students already studying smarter. Start for free — no credit card needed.
           </p>
           <button 
             onClick={() => navigate('/register')}

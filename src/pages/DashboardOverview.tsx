@@ -65,7 +65,7 @@ setProfile(p);
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-text-primary tracking-tight">Welcome, {profile.full_name?.split(' ')[0]}!</h1>
-          <p className="text-sm text-text-secondary mt-1 font-medium">Ready to ace your Achievers exams today?</p>
+          <p className="text-sm text-text-secondary mt-1 font-medium">Ready to ace your next exam today?</p>
         </div>
         <div className="flex items-center bg-white px-4 py-2 border border-border rounded-xl shadow-sm w-fit">
           <div className="flex space-x-1 mr-3">
@@ -86,7 +86,7 @@ setProfile(p);
             <Sparkles className="absolute -top-10 -right-10 h-64 w-64 opacity-10 animate-pulse" />
             <div className="relative z-10 max-w-lg">
               <h2 className="text-2xl md:text-4xl font-black mb-4 leading-tight">Find any past question in seconds.</h2>
-              <p className="text-white/80 text-sm md:text-base font-medium mb-8">Access thousands of Achievers University past questions, solved by AI.</p>
+              <p className="text-white/80 text-sm md:text-base font-medium mb-8">Access thousands of past questions from your university, solved by AI.</p>
               
               <form 
                 onSubmit={(e) => { e.preventDefault(); navigate(`/dashboard/questions?search=${query}`); }} 
@@ -213,7 +213,7 @@ setProfile(p);
                <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <h4 className="font-black text-text-primary text-lg mb-2">Stuck on a topic?</h4>
-            <p className="text-xs text-text-secondary mb-6 leading-relaxed font-medium">Ask CourseGPT AI to explain any difficult Achievers concept.</p>
+            <p className="text-xs text-text-secondary mb-6 leading-relaxed font-medium">Ask CourseGPT AI to explain any difficult concept from your courses.</p>
             <div className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center border-b-2 border-primary/20 w-fit group-hover:border-primary transition-all">
               Launch AI Tutor <ChevronRight className="h-3 w-3 ml-1" />
             </div>
