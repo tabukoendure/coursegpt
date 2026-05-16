@@ -345,14 +345,23 @@ Be specific, practical and encouraging.`;
                   className="bg-white p-5 rounded-2xl border border-border flex justify-between items-center shadow-sm"
                 >
                   <div className="flex-1 truncate mr-3">
-                    <div className="flex items-center space-x-2 mb-0.5">
-                      <span className="font-black text-primary tracking-tighter uppercase">{exam.course_code}</span>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter ${days < 7 ? 'bg-error text-white' : 'bg-bg text-text-secondary'}`}>
-                        {days === 0 ? 'Today' : days < 0 ? 'Ended' : `${days}d`}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-text-secondary font-medium truncate">{exam.course_name || 'Course'}</div>
-                  </div>
+  <div className="flex items-center space-x-2 mb-0.5">
+    <span className="font-black text-primary tracking-tighter uppercase">{exam.course_code}</span>
+    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter ${days < 7 ? 'bg-error text-white' : 'bg-bg text-text-secondary'}`}>
+      {days === 0 ? 'Today' : days < 0 ? 'Ended' : `${days}d`}
+    </span>
+  </div>
+  <div className="text-[10px] text-text-secondary font-medium truncate">{exam.course_name || 'Course'}</div>
+  <button
+    onClick={() => {
+      const text = `⏰ *${days === 0 ? 'TODAY' : `${days} days`} to ${exam.course_code} exam!*\n\n📚 ${exam.course_name || exam.course_code}\n📅 ${new Date(exam.exam_date).toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' })}\n\nI'm studying with CourseGPT 🎓\nhttps://mycoursegpt.com`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }}
+    className="mt-1.5 flex items-center gap-1 text-[9px] font-black text-green-600 uppercase tracking-widest hover:underline"
+  >
+    <Share2 className="h-2.5 w-2.5" /> Share Countdown
+  </button>
+</div>
 
                   <div className="relative">
                     <button

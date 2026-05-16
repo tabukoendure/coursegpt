@@ -9,6 +9,7 @@ import { motion } from 'motion/react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const referralCode = new URLSearchParams(window.location.search).get('ref') || '';
   const [formData, setFormData] = React.useState({
     fullName: '',
     email: '',
@@ -75,6 +76,7 @@ export default function RegisterPage() {
     email: formData.email,
     level: formData.level,
     department: formData.department,
+        referred_by: referralCode || null,
   }]);
 
         if (profileError) console.error('Profile error:', profileError);
