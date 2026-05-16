@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Download, Share2, Filter, Sparkles, BookOpen, AlertCircle, ChevronRight, FileText, Eye, X } from 'lucide-react';
+import { Search, Download, Share2, Filter, Sparkles, BookOpen, AlertCircle, ChevronRight, FileText, Eye, X, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -17,11 +17,13 @@ export default function Questions() {
   const [loading, setLoading] = React.useState(true);
   const [viewingPdf, setViewingPdf] = React.useState<{ url: string; title: string } | null>(null);
   const [userUniversity, setUserUniversity] = React.useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        setCurrentUserId(user.id);
         const { data: profile } = await supabase.from('profiles').select('university').eq('id', user.id).maybeSingle();
         setUserUniversity(profile?.university || null);
       }
@@ -78,9 +80,48 @@ export default function Questions() {
     link.click();
   };
 
+  const handleVote = async (id: string, type: 'up' | 'down') => {
+    if (!currentUserId) return;
+    const question = questions.find(q => q.id === id);
+    if (!question) return;
+
+    const votes = question.user_votes || {};
+    const previousVote = votes[currentUserId];
+
+    // If same vote clicked again — remove vote
+    if (previousVote === type) {
+      votes[currentUserId] = null;
+      delete votes[currentUserId];
+      const newUpvotes = type === 'up' ? (question.upvotes || 0) - 1 : (question.upvotes || 0);
+      const newDownvotes = type === 'down' ? (question.downvotes || 0) - 1 : (question.downvotes || 0);
+      await supabase.from('past_questions').update({ upvotes: newUpvotes, downvotes: newDownvotes, user_votes: votes }).eq('id', id);
+      setQuestions(prev => prev.map(q => q.id === id ? { ...q, upvotes: newUpvotes, downvotes: newDownvotes, user_votes: votes } : q));
+      return;
+    }
+
+    // Switch or new vote
+    let newUpvotes = question.upvotes || 0;
+    let newDownvotes = question.downvotes || 0;
+
+    if (previousVote === 'up') newUpvotes--;
+    if (previousVote === 'down') newDownvotes--;
+    if (type === 'up') newUpvotes++;
+    if (type === 'down') newDownvotes++;
+
+    votes[currentUserId] = type;
+
+    await supabase.from('past_questions').update({ upvotes: newUpvotes, downvotes: newDownvotes, user_votes: votes }).eq('id', id);
+    setQuestions(prev => prev.map(q => q.id === id ? { ...q, upvotes: newUpvotes, downvotes: newDownvotes, user_votes: votes } : q));
+  };
+
   const shareToWhatsapp = (courseCode: string) => {
     const text = `Check out this ${courseCode} past question on CourseGPT — Study smarter! https://mycoursegpt.com`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const getUserVote = (question: any) => {
+    if (!currentUserId) return null;
+    return question.user_votes?.[currentUserId] || null;
   };
 
   return (
@@ -103,6 +144,7 @@ export default function Questions() {
         Tip: Search by course code (BCH201) or course name (Biochemistry) — both work!
       </div>
 
+      {/* Filters */}
       <section className="bg-white p-4 md:p-6 rounded-[2rem] border border-border shadow-sm">
         <form onSubmit={handleSearch} className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 relative group">
@@ -131,7 +173,7 @@ export default function Questions() {
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
               placeholder="Department..."
-              className="px-4 py-4 bg-bg border border-border rounded-2xl focus:outline-none focus:border-primary transition-all text-xs font-black uppercase tracking-widest w-40"
+              className="px-4 py-4 bg-bg border border-border rounded-2xl focus:outline-none focus:border-primary transition-all text-xs font-black w-40"
             />
             <button type="submit" className="flex-1 lg:flex-none px-8 py-4 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
               Search
@@ -148,43 +190,67 @@ export default function Questions() {
             </div>
           ) : questions.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {questions.map((q, idx) => (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  key={q.id}
-                  className="bg-white p-6 rounded-3xl border border-border hover:border-primary/30 transition-all shadow-sm hover:shadow-xl hover:shadow-primary/5"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <div className="text-2xl font-black text-primary mb-1 tracking-tighter uppercase">{q.course_code}</div>
-                      <div className="text-sm font-bold text-text-primary line-clamp-1">{q.course_name || 'Course'}</div>
+              {questions.map((q, idx) => {
+                const userVote = getUserVote(q);
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    key={q.id}
+                    className="bg-white p-6 rounded-3xl border border-border hover:border-primary/30 transition-all shadow-sm hover:shadow-xl hover:shadow-primary/5"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <div className="text-2xl font-black text-primary mb-1 tracking-tighter uppercase">{q.course_code}</div>
+                        <div className="text-sm font-bold text-text-primary line-clamp-1">{q.course_name || 'Course'}</div>
+                      </div>
+                      <div className="px-3 py-1 bg-bg text-text-secondary text-[9px] font-black rounded-full uppercase tracking-widest border border-border">{q.year}</div>
                     </div>
-                    <div className="px-3 py-1 bg-bg text-text-secondary text-[9px] font-black rounded-full uppercase tracking-widest border border-border">{q.year}</div>
-                  </div>
 
-                  <div className="flex items-center space-x-3 text-[10px] font-black uppercase tracking-widest text-text-secondary mb-6">
-                    <span className="bg-primary/10 text-primary px-2 py-1 rounded">{q.department}</span>
-                    <span className="flex items-center"><Download className="h-3 w-3 mr-1 opacity-50" />{q.download_count || 0} downloads</span>
-                  </div>
+                    <div className="flex items-center space-x-3 text-[10px] font-black uppercase tracking-widest text-text-secondary mb-4">
+                      <span className="bg-primary/10 text-primary px-2 py-1 rounded">{q.department}</span>
+                      <span className="flex items-center"><Download className="h-3 w-3 mr-1 opacity-50" />{q.download_count || 0} downloads</span>
+                    </div>
 
-                  <div className="flex gap-2">
-                    <button onClick={() => handleView(q.file_url, q.course_code)}
-                      className="flex-1 py-3 border border-primary text-primary rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/5 transition-all flex items-center justify-center gap-2">
-                      <Eye className="h-4 w-4" /> View
-                    </button>
-                    <button onClick={() => handleDownload(q.file_url, q.id)}
-                      className="flex-1 py-3 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
-                      <Download className="h-4 w-4" /> Download
-                    </button>
-                    <button onClick={() => shareToWhatsapp(q.course_code)}
-                      className="p-3 bg-[#25D366] text-white rounded-xl hover:opacity-90 transition-all flex items-center justify-center">
-                      <Share2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
+                    {/* Rating */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <button
+                        onClick={() => handleVote(q.id, 'up')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${userVote === 'up' ? 'bg-success text-white border-success' : 'border-border text-text-secondary hover:border-success hover:text-success'}`}
+                      >
+                        <ThumbsUp className="h-3.5 w-3.5" /> {q.upvotes || 0}
+                      </button>
+                      <button
+                        onClick={() => handleVote(q.id, 'down')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${userVote === 'down' ? 'bg-error text-white border-error' : 'border-border text-text-secondary hover:border-error hover:text-error'}`}
+                      >
+                        <ThumbsDown className="h-3.5 w-3.5" /> {q.downvotes || 0}
+                      </button>
+                      {(q.upvotes || 0) >= 10 && (
+                        <span className="ml-auto text-[9px] font-black text-success uppercase tracking-widest bg-success/10 px-2 py-1 rounded-lg border border-success/20">
+                          ✓ Verified
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button onClick={() => handleView(q.file_url, q.course_code)}
+                        className="flex-1 py-3 border border-primary text-primary rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/5 transition-all flex items-center justify-center gap-2">
+                        <Eye className="h-4 w-4" /> View
+                      </button>
+                      <button onClick={() => handleDownload(q.file_url, q.id)}
+                        className="flex-1 py-3 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2">
+                        <Download className="h-4 w-4" /> Download
+                      </button>
+                      <button onClick={() => shareToWhatsapp(q.course_code)}
+                        className="p-3 bg-[#25D366] text-white rounded-xl hover:opacity-90 transition-all flex items-center justify-center">
+                        <Share2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           ) : (
             <div className="bg-white p-12 md:p-20 rounded-[2.5rem] border border-border text-center shadow-sm">
