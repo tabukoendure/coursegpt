@@ -88,7 +88,7 @@ export default function Profile() {
   const uploadPoints = (profile?.points || 0);
   const referralPoints = referralCount * 50;
   const totalPoints = uploadPoints + referralPoints;
-  const airtimeValue = Math.floor(totalPoints / 100) * 50;
+const airtimeValue = totalPoints;
 
   if (loading) return (
     <div className="animate-pulse space-y-6">
@@ -152,8 +152,8 @@ export default function Profile() {
 
         <div className="p-3 bg-primary/5 border border-primary/10 rounded-xl">
           <p className="text-[10px] font-black text-primary uppercase tracking-widest">
-            Every referral = 50 points • 100 points = ₦50 airtime • Paid every Friday
-          </p>
+  1 upload = 25pts = ₦25 • 1 referral = 50pts = ₦50 • Paid every Friday
+</p>
         </div>
 
         {/* Referral link */}

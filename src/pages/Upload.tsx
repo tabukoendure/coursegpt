@@ -271,10 +271,10 @@ export default function Upload() {
                 </h3>
                 <div className="space-y-4">
                   {[
-                    { title: 'Airtime Voucher', desc: '5 points per download • 100 pts = ₦100', icon: CreditCard, color: 'text-blue-600 bg-blue-50' },
-                    { title: 'Honor Role', desc: 'Top contributors get prime site badges', icon: Award, color: 'text-purple-600 bg-purple-50' },
-                    { title: 'Referral Bonus', desc: '50 points for every friend you refer', icon: TrendingUp, color: 'text-success bg-success/5' }
-                  ].map((r, i) => (
+{ title: 'Airtime Voucher', desc: '25 points per upload = ₦25', icon: CreditCard, color: 'text-blue-600 bg-blue-50' },
+{ title: 'Honor Role', desc: 'Top contributors get prime site badges', icon: Award, color: 'text-purple-600 bg-purple-50' },
+{ title: 'Referral Bonus', desc: '1 referral who signs up = 50 points = ₦50', icon: TrendingUp, color: 'text-success bg-success/5' }
+].map((r, i) => (
                     <div key={i} className="flex items-center space-x-4 p-5 bg-white border border-border/10 rounded-[2rem] hover:bg-bg/40 transition-all cursor-default">
                       <div className={`p-4 rounded-2xl ${r.color}`}><r.icon className="h-6 w-6" /></div>
                       <div>
@@ -317,8 +317,8 @@ export default function Upload() {
                   <DownloadIcon className="h-8 w-8" />
                 </div>
                 <div>
-                  <div className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-1">Total Downloads</div>
-                  <div className="text-3xl font-black text-text-primary tracking-tighter">{totalDownloads}</div>
+<div className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-1">Total Uploads</div>                 
+<div className="text-3xl font-black text-text-primary tracking-tighter">{myUploads.length}</div>
                 </div>
               </div>
 
