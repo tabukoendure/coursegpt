@@ -1,72 +1,194 @@
 import React from 'react';
 import { supabase } from '../lib/supabase';
-import { 
-  Zap, Check, ArrowLeft, 
-  Loader2, GraduationCap 
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Zap, Check, ArrowLeft, Loader2, GraduationCap, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 
+const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+const PRO_PLAN = import.meta.env.VITE_PAYSTACK_PRO_PLAN;
+const PREMIUM_PLAN = import.meta.env.VITE_PAYSTACK_PREMIUM_PLAN;
+
 export default function ProWaitlist() {
-  const [email, setEmail] = React.useState('');
-  const [name, setName] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
-  const [joined, setJoined] = React.useState(false);
+  const navigate = useNavigate();
+  const [user, setUser] = React.useState<any>(null);
+  const [profile, setProfile] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [subscribing, setSubscribing] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState('');
   const [error, setError] = React.useState('');
 
   React.useEffect(() => {
-    const prefill = async () => {
-      const { data: { user } } = 
-        await supabase.auth.getUser();
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        setEmail(user.email || '');
-        const { data } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (data) setName(data.full_name || '');
+        setUser(user);
+        const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        setProfile(data);
       }
+      setLoading(false);
     };
-    prefill();
+    init();
   }, []);
 
-  const handleJoin = async () => {
-    if (!email || !name) {
-      setError('Please fill in all fields');
-      return;
-    }
-    setLoading(true);
+  const handleSubscribe = async (planType: 'pro' | 'premium') => {
+    if (!user) { navigate('/login'); return; }
+    setSubscribing(planType);
     setError('');
+
+    const planCode = planType === 'pro' ? PRO_PLAN : PREMIUM_PLAN;
+    const amount = planType === 'pro' ? 150000 : 250000;
+
     try {
-      await supabase.from('pro_waitlist').insert([{
-        email,
-        name,
-        joined_at: new Date().toISOString(),
-      }]);
-      setJoined(true);
-    } catch (err) {
-      setError(
-        'Something went wrong. Please try again.'
-      );
-    } finally {
-      setLoading(false);
+      // Load Paystack inline
+      const PaystackPop = (window as any).PaystackPop;
+      if (!PaystackPop) {
+        // Load Paystack script dynamically
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://js.paystack.co/v1/inline.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      const handler = (window as any).PaystackPop.setup({
+        key: PAYSTACK_PUBLIC_KEY,
+        email: user.email,
+        amount,
+        plan: planCode,
+        currency: 'NGN',
+        ref: `coursegpt_${planType}_${user.id}_${Date.now()}`,
+        metadata: {
+          user_id: user.id,
+          plan: planType,
+          full_name: profile?.full_name || '',
+        },
+        callback: async (response: any) => {
+          // Payment successful — update profile
+          try {
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 30);
+
+            await supabase.from('profiles').update({
+              plan: planType,
+              is_pro: true,
+              pro_expires_at: expiresAt.toISOString(),
+              paystack_subscription_code: response.reference,
+            }).eq('id', user.id);
+
+            // Log transaction
+            await supabase.from('transactions').insert([{
+              user_id: user.id,
+              type: 'subscription',
+              points: 0,
+              description: `${planType === 'pro' ? 'Pro Student' : 'Premium'} subscription — ₦${planType === 'pro' ? '1,500' : '2,500'}/month`,
+            }]);
+
+            setProfile((prev: any) => ({ ...prev, plan: planType, is_pro: true }));
+            setSuccess(`🎉 You are now on the ${planType === 'pro' ? 'Pro Student' : 'Premium'} plan!`);
+            setTimeout(() => setSuccess(''), 5000);
+          } catch (err) {
+            console.error('Profile update error:', err);
+          }
+          setSubscribing(null);
+        },
+        onClose: () => {
+          setSubscribing(null);
+        },
+      });
+
+      handler.openIframe();
+    } catch (err: any) {
+      setError('Failed to load payment. Please try again.');
+      setSubscribing(null);
     }
   };
 
-  const proFeatures = [
-    'Unlimited AI messages per day',
-    'Upload unlimited PDFs for AI chat',
-    'Priority access to new past questions',
-    'Advanced exam predictions',
-    'Personalized weekly study reports',
-    'Ad-free experience',
+  const handleCancelSubscription = async () => {
+    if (!window.confirm('Cancel your subscription? You will lose Pro access at the end of your billing period.')) return;
+    try {
+      await supabase.from('profiles').update({
+        plan: 'free',
+        is_pro: false,
+        pro_expires_at: null,
+        paystack_subscription_code: null,
+      }).eq('id', user.id);
+      setProfile((prev: any) => ({ ...prev, plan: 'free', is_pro: false }));
+      setSuccess('Subscription cancelled. You have been moved to the Free plan.');
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (err) {
+      setError('Failed to cancel. Please contact support.');
+    }
+  };
+
+  const currentPlan = profile?.plan || 'free';
+
+  const plans = [
+    {
+      id: 'free',
+      name: 'Free',
+      price: '₦0',
+      period: 'forever',
+      color: 'border-border',
+      headerColor: 'bg-bg',
+      features: [
+        '10 AI messages per day',
+        '3 PDF uploads per day (tools)',
+        '5MB PDF size limit',
+        'Unlimited past question uploads',
+        'Basic quiz & flashcards',
+        'Study planner',
+      ],
+    },
+    {
+      id: 'pro',
+      name: 'Pro Student',
+      price: '₦1,500',
+      period: '/month',
+      color: 'border-primary',
+      headerColor: 'bg-primary',
+      badge: 'Most Popular',
+      features: [
+        '30 AI messages per day',
+        '10 PDF uploads per day (tools)',
+        '15MB PDF size limit',
+        'Unlimited past question uploads',
+        'Extended quiz & flashcards',
+        'Priority AI responses',
+        'Study planner + AI study tips',
+      ],
+    },
+    {
+      id: 'premium',
+      name: 'Premium',
+      price: '₦2,500',
+      period: '/month',
+      color: 'border-yellow-400',
+      headerColor: 'bg-gradient-to-br from-yellow-400 to-orange-500',
+      badge: 'Best Value',
+      features: [
+        'Unlimited AI messages',
+        'Unlimited PDF uploads (tools)',
+        '50MB PDF size limit',
+        'Unlimited past question uploads',
+        'Full quiz & flashcards',
+        'Fastest AI priority',
+        'All features, no restrictions',
+      ],
+    },
   ];
+
+  if (loading) return (
+    <div className="min-h-screen bg-bg flex items-center justify-center">
+      <Loader2 className="h-8 w-8 text-primary animate-spin" />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-bg">
       {/* Top bar */}
-      <div className="bg-white border-b border-border px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-border px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <Link to="/" className="flex items-center gap-2">
           <div className="p-1.5 bg-primary rounded-lg">
             <GraduationCap className="h-5 w-5 text-white" />
@@ -75,172 +197,128 @@ export default function ProWaitlist() {
             COURSE<span className="text-primary">GPT</span>
           </span>
         </Link>
-        <Link
-          to="/dashboard"
-          className="flex items-center gap-2 text-sm font-bold text-text-secondary hover:text-primary transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to dashboard
+        <Link to="/dashboard" className="flex items-center gap-2 text-sm font-bold text-text-secondary hover:text-primary transition-colors">
+          <ArrowLeft className="h-4 w-4" /> Back to dashboard
         </Link>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="max-w-5xl mx-auto px-4 py-12">
+
         {/* Header */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-black uppercase tracking-widest mb-6">
-            <Zap className="h-4 w-4" />
-            Coming Soon
+            <Zap className="h-4 w-4" /> Upgrade Your Plan
           </div>
           <h1 className="text-4xl font-black text-text-primary tracking-tight mb-4">
-            CourseGPT Pro
+            Study smarter with Pro
           </h1>
           <p className="text-lg text-text-secondary max-w-xl mx-auto">
-            Everything you need to not just pass — 
-            but excel. Join the waitlist and be first 
-            to know when Pro launches.
+            More AI messages, bigger PDFs, unlimited tools. Cancel anytime.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Features */}
-          <div className="bg-white border border-border rounded-[2rem] p-8">
-            <h2 className="text-xl font-black text-text-primary mb-2">
-              What you get with Pro
-            </h2>
-            <p className="text-sm text-text-secondary mb-6">
-              For just ₦1,000/month
-            </p>
-            <div className="space-y-4">
-              {proFeatures.map((feature, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <div className="h-6 w-6 bg-success/10 rounded-full flex items-center justify-center shrink-0">
-                    <Check className="h-3.5 w-3.5 text-success" />
-                  </div>
-                  <span className="text-sm font-bold text-text-primary">
-                    {feature}
-                  </span>
-                </div>
-              ))}
+        {/* Current plan banner */}
+        {currentPlan !== 'free' && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-8 flex items-center justify-between">
+            <div>
+              <p className="font-black text-primary text-sm">
+                ✓ You are on the {currentPlan === 'pro' ? 'Pro Student' : 'Premium'} plan
+              </p>
+              {profile?.pro_expires_at && (
+                <p className="text-xs text-text-secondary mt-0.5">
+                  Renews on {new Date(profile.pro_expires_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+              )}
             </div>
+            <button onClick={handleCancelSubscription} className="text-xs font-black text-error hover:underline uppercase tracking-widest">
+              Cancel Plan
+            </button>
+          </motion.div>
+        )}
 
-            {/* Free vs Pro comparison */}
-            <div className="mt-8 pt-6 border-t border-border">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div />
-                <div className="text-[10px] font-black text-text-secondary uppercase tracking-widest">
-                  Free
+        {/* Alerts */}
+        {success && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-success/10 border border-success/20 text-success rounded-2xl px-4 py-3 text-sm font-bold flex items-center gap-2 mb-6">
+            <Check className="h-4 w-4" /> {success}
+          </motion.div>
+        )}
+        {error && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-error/10 border border-error/20 text-error rounded-2xl px-4 py-3 text-sm font-bold mb-6">
+            {error}
+          </motion.div>
+        )}
+
+        {/* Plans Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {plans.map(plan => (
+            <div key={plan.id} className={`bg-white rounded-[2rem] border-2 overflow-hidden transition-all ${plan.color} ${currentPlan === plan.id ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
+
+              {/* Plan header */}
+              <div className={`${plan.headerColor} p-6`}>
+                {plan.badge && (
+                  <span className="inline-block bg-white/20 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">
+                    {plan.badge}
+                  </span>
+                )}
+                <h2 className={`text-xl font-black mb-1 ${plan.id === 'free' ? 'text-text-primary' : 'text-white'}`}>
+                  {plan.name}
+                </h2>
+                <div className={`flex items-baseline gap-1 ${plan.id === 'free' ? 'text-text-primary' : 'text-white'}`}>
+                  <span className="text-3xl font-black">{plan.price}</span>
+                  <span className={`text-sm font-bold ${plan.id === 'free' ? 'text-text-secondary' : 'text-white/70'}`}>{plan.period}</span>
                 </div>
-                <div className="text-[10px] font-black text-primary uppercase tracking-widest">
-                  Pro
-                </div>
-                {[
-                  ['AI messages/day', '30', 'Unlimited'],
-                  ['PDF uploads', '1', 'Unlimited'],
-                  ['Past questions', '✓', '✓ Priority'],
-                  ['Study planner', '✓', '✓ Advanced'],
-                ].map(([label, free, pro]) => (
-                  <React.Fragment key={label}>
-                    <div className="text-xs font-bold text-text-secondary text-left py-2 border-b border-border">
-                      {label}
+              </div>
+
+              {/* Features */}
+              <div className="p-6 space-y-3">
+                {plan.features.map((feature, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="h-5 w-5 bg-success/10 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="h-3 w-3 text-success" />
                     </div>
-                    <div className="text-xs font-bold text-text-secondary py-2 border-b border-border">
-                      {free}
-                    </div>
-                    <div className="text-xs font-black text-primary py-2 border-b border-border">
-                      {pro}
-                    </div>
-                  </React.Fragment>
+                    <span className="text-sm font-bold text-text-primary">{feature}</span>
+                  </div>
                 ))}
               </div>
-            </div>
-          </div>
 
-          {/* Waitlist form */}
-          <div className="bg-white border border-border rounded-[2rem] p-8">
-            {!joined ? (
-              <>
-                <h2 className="text-xl font-black text-text-primary mb-2">
-                  Join the waitlist
-                </h2>
-                <p className="text-sm text-text-secondary mb-6">
-                  Be first to know when Pro launches. 
-                  Early birds get a special discount.
-                </p>
-
-                {error && (
-                  <div className="bg-error/10 border border-error/20 text-error rounded-xl px-4 py-3 text-sm font-bold mb-4">
-                    {error}
+              {/* CTA Button */}
+              <div className="px-6 pb-6">
+                {currentPlan === plan.id ? (
+                  <div className="w-full py-3 bg-success/10 text-success font-black text-xs uppercase tracking-widest rounded-2xl text-center">
+                    ✓ Current Plan
                   </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      placeholder="Your name"
-                      className="w-full border border-border rounded-xl px-4 py-3 text-sm font-bold text-text-primary outline-none focus:ring-2 focus:ring-primary/20"
-                    />
+                ) : plan.id === 'free' ? (
+                  <div className="w-full py-3 bg-bg border border-border text-text-secondary font-black text-xs uppercase tracking-widest rounded-2xl text-center">
+                    Free Forever
                   </div>
-                  <div>
-                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      className="w-full border border-border rounded-xl px-4 py-3 text-sm font-bold text-text-primary outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
+                ) : (
                   <button
-                    onClick={handleJoin}
-                    disabled={loading}
-                    className="w-full bg-primary text-white rounded-xl py-4 text-sm font-black uppercase tracking-widest hover:bg-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                    onClick={() => handleSubscribe(plan.id as 'pro' | 'premium')}
+                    disabled={subscribing !== null}
+                    className={`w-full py-3 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg ${plan.id === 'pro' ? 'bg-primary hover:bg-primary/90 shadow-primary/20' : 'bg-gradient-to-r from-yellow-400 to-orange-500 hover:opacity-90 shadow-yellow-400/20'}`}
                   >
-                    {loading
-                      ? <Loader2 className="h-4 w-4 animate-spin" />
-                      : <><Zap className="h-4 w-4" /> Join Waitlist</>
+                    {subscribing === plan.id
+                      ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
+                      : <><Zap className="h-4 w-4" /> Subscribe Now</>
                     }
                   </button>
-                  <p className="text-center text-xs text-text-secondary opacity-60">
-                    No spam. We'll only email you when Pro launches.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="text-center py-8"
-              >
-                <div className="h-16 w-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="h-8 w-8 text-success" />
-                </div>
-                <h3 className="text-xl font-black text-text-primary mb-2">
-                  You're on the list! 🎉
-                </h3>
-                <p className="text-sm text-text-secondary mb-6">
-                  We'll notify you at{' '}
-                  <span className="font-bold text-text-primary">
-                    {email}
-                  </span>{' '}
-                  when Pro launches. Early birds get a special discount.
-                </p>
-                <Link
-                  to="/dashboard"
-                  className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl text-sm font-black hover:bg-primary/90 transition-all"
-                >
-                  Back to studying
-                </Link>
-              </motion.div>
-            )}
-          </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Notice */}
+        <div className="mt-8 text-center space-y-2">
+          <p className="text-xs text-text-secondary font-medium">
+            Payments are processed securely by Paystack. Cancel anytime from this page.
+          </p>
+          <p className="text-xs text-text-secondary font-medium">
+            Your plan renews automatically every 30 days. You will be notified before renewal.
+          </p>
         </div>
       </div>
     </div>
