@@ -9,6 +9,9 @@ export default function DashboardLayout() {
   const location = useLocation();
   const [profile, setProfile] = React.useState<any>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+const [newUploads, setNewUploads] = React.useState(0);
+const [showNotif, setShowNotif] = React.useState(false);
+const [notifList, setNotifList] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     const fetchProfile = async () => {
@@ -45,6 +48,24 @@ export default function DashboardLayout() {
           }
 
           setProfile({ ...data, study_streak: newStreak });
+
+// Fetch new uploads since last visit
+const lastVisit = data.last_active
+  ? new Date(new Date(data.last_active).getTime() - 24 * 60 * 60 * 1000).toISOString()
+  : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+const { data: uploads } = await supabase
+  .from('past_questions')
+  .select('course_code, course_name, created_at')
+  .eq('university', data.university)
+  .gte('created_at', lastVisit)
+  .order('created_at', { ascending: false })
+  .limit(10);
+
+if (uploads && uploads.length > 0) {
+  setNewUploads(uploads.length);
+  setNotifList(uploads);
+}
         } else {
           setProfile({ full_name: 'Student', level: 'Unknown', department: 'Unknown' });
         }
@@ -109,12 +130,46 @@ export default function DashboardLayout() {
             COURSE<span className="text-primary">GPT</span>
           </span>
         </div>
-        <button
-          onClick={() => setMobileMenuOpen(true)}
-          className="p-2 text-text-secondary hover:text-primary transition-colors"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
+        <div className="flex items-center gap-2">
+  <div className="relative">
+    <button
+      onClick={() => setShowNotif(!showNotif)}
+      className="p-2 text-text-secondary hover:text-primary transition-colors relative"
+    >
+      <Bell className="h-5 w-5" />
+      {newUploads > 0 && (
+        <span className="absolute top-1 right-1 h-2 w-2 bg-error rounded-full" />
+      )}
+    </button>
+    {showNotif && (
+      <div className="absolute right-0 top-12 w-80 bg-white border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <span className="font-black text-text-primary text-sm">Notifications</span>
+          <button onClick={() => { setShowNotif(false); setNewUploads(0); }} className="text-xs text-primary font-bold">Mark all read</button>
+        </div>
+        {notifList.length === 0 ? (
+          <div className="p-6 text-center text-sm text-text-secondary font-medium">No new notifications</div>
+        ) : (
+          <div className="divide-y divide-border max-h-72 overflow-y-auto">
+            {notifList.map((n, i) => (
+              <div key={i} className="p-4 hover:bg-bg transition-all cursor-pointer" onClick={() => { setShowNotif(false); setNewUploads(0); }}>
+                <p className="text-sm font-bold text-text-primary">📚 New: {n.course_code}</p>
+                <p className="text-xs text-text-secondary mt-0.5">{n.course_name || 'Past question uploaded'}</p>
+                <p className="text-[10px] text-text-secondary opacity-60 mt-1">{new Date(n.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+  <button
+    onClick={() => setMobileMenuOpen(true)}
+    className="p-2 text-text-secondary hover:text-primary transition-colors"
+  >
+    <Menu className="h-6 w-6" />
+  </button>
+</div>
       </div>
 
       {/* Mobile Drawer — Full Menu */}
@@ -221,16 +276,44 @@ export default function DashboardLayout() {
 
       {/* Desktop Sidebar */}
       <aside className="w-64 border-r border-border bg-white hidden md:flex flex-col h-screen sticky top-0">
-        <div className="p-8">
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="p-2 bg-primary rounded-xl shadow-lg shadow-primary/20">
-              <GraduationCap className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-black text-text-primary tracking-tight uppercase">
-              COURSE<span className="text-primary">GPT</span>
-            </span>
-          </Link>
+        <div className="p-8 flex items-center justify-between">
+  <Link to="/" className="flex items-center space-x-2">
+    <div className="p-2 bg-primary rounded-xl shadow-lg shadow-primary/20">
+      <GraduationCap className="h-6 w-6 text-white" />
+    </div>
+    <span className="text-xl font-black text-text-primary tracking-tight uppercase">
+      COURSE<span className="text-primary">GPT</span>
+    </span>
+  </Link>
+  <div className="relative">
+    <button onClick={() => setShowNotif(!showNotif)} className="p-2 text-text-secondary hover:text-primary transition-colors relative">
+      <Bell className="h-5 w-5" />
+      {newUploads > 0 && <span className="absolute top-1 right-1 h-2 w-2 bg-error rounded-full" />}
+    </button>
+    {showNotif && (
+      <div className="absolute right-0 top-12 w-80 bg-white border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <span className="font-black text-text-primary text-sm">Notifications</span>
+          <button onClick={() => { setShowNotif(false); setNewUploads(0); }} className="text-xs text-primary font-bold">Mark all read</button>
         </div>
+        {notifList.length === 0 ? (
+          <div className="p-6 text-center text-sm text-text-secondary font-medium">No new notifications</div>
+        ) : (
+          <div className="divide-y divide-border max-h-72 overflow-y-auto">
+            {notifList.map((n, i) => (
+              <div key={i} className="p-4 hover:bg-bg transition-all cursor-pointer" onClick={() => { setShowNotif(false); setNewUploads(0); }}>
+                <p className="text-sm font-bold text-text-primary">📚 New: {n.course_code}</p>
+                <p className="text-xs text-text-secondary mt-0.5">{n.course_name || 'Past question uploaded'}</p>
+                <p className="text-[10px] text-text-secondary opacity-60 mt-1">{new Date(n.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</div>
+
 
         <nav className="flex-1 px-4 space-y-8 overflow-y-auto pb-10">
           <div>
