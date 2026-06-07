@@ -343,17 +343,14 @@ export default function Upload() {
               </div>
             </div>
 
-            {/* Withdraw button */}
-            <div className="bg-white p-6 rounded-[2rem] border border-border shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-sm font-black text-text-primary">Ready to withdraw?</p>
-                <p className="text-xs text-text-secondary mt-0.5">Minimum ₦500 • Processed every Friday</p>
-              </div>
-              <button className="px-6 py-3 bg-primary text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
-                Withdraw Rewards ↗
-              </button>
-            </div>
-
+{/* Withdraw button */}
+<div className="bg-white p-6 rounded-[2rem] border border-border shadow-sm flex items-center justify-between">
+  <div>
+    <p className="text-sm font-black text-text-primary">Ready to withdraw?</p>
+    <p className="text-xs text-text-secondary mt-0.5">Minimum ₦500 • Processed every Friday</p>
+  </div>
+  <WithdrawButton points={userPoints} onSuccess={fetchMyUploads} />
+</div>
             {/* Upload History */}
             <section className="bg-white rounded-[3rem] border border-border shadow-sm overflow-hidden min-h-[400px]">
               <div className="p-8 border-b border-border bg-bg/5 flex justify-between items-center">
@@ -431,6 +428,116 @@ export default function Upload() {
   );
 }
 
+function WithdrawButton({ points, onSuccess }: { userId?: string; points: number; onSuccess: () => void }) {
+  const [open, setOpen] = React.useState(false);
+  const [phone, setPhone] = React.useState('');
+  const [network, setNetwork] = React.useState('MTN');
+  const [loading, setLoading] = React.useState(false);
+  const [done, setDone] = React.useState(false);
+  const MIN = 500;
+
+  const handleSubmit = async () => {
+    if (!phone) return;
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from('profiles').select('full_name, points').eq('id', user.id).maybeSingle();
+      
+      const { error } = await supabase.from('withdrawal_requests').insert([{
+        user_id: user.id,
+        full_name: profile?.full_name,
+        phone,
+        network,
+        amount_requested: profile?.points || 0,
+      }]);
+      if (error) throw error;
+      setDone(true);
+      onSuccess();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (points < MIN) {
+    return (
+      <div className="text-center">
+        <p className="text-[10px] font-black text-text-secondary uppercase tracking-widest">
+          Need {MIN - points} more points for withdrawal
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="px-6 py-3 bg-primary text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+      >
+        Withdraw ₦{points} ↗
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] p-8 w-full max-w-sm shadow-2xl">
+            {done ? (
+              <div className="text-center py-4">
+                <div className="h-16 w-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="h-8 w-8 text-success" />
+                </div>
+                <h3 className="font-black text-text-primary text-lg mb-2">Request Submitted!</h3>
+                <p className="text-sm text-text-secondary mb-6">Your withdrawal of ₦{points} has been submitted. Payment is processed every Friday.</p>
+                <button onClick={() => { setOpen(false); setDone(false); }} className="w-full py-3 bg-primary text-white font-black text-xs uppercase tracking-widest rounded-2xl">
+                  Done
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className="font-black text-text-primary text-lg mb-1">Withdraw ₦{points}</h3>
+                <p className="text-sm text-text-secondary mb-6">Enter your airtime details. Payment processed every Friday.</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      placeholder="08012345678"
+                      className="w-full border border-border rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Network</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {['MTN', 'Airtel', 'Glo', '9mobile'].map(n => (
+                        <button key={n} onClick={() => setNetwork(n)}
+                          className={`py-2.5 rounded-xl text-[10px] font-black border transition-all ${network === n ? 'bg-primary text-white border-primary' : 'border-border text-text-secondary hover:border-primary/40'}`}>
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={() => setOpen(false)} className="flex-1 py-3 border border-border rounded-xl text-sm font-black text-text-secondary">
+                    Cancel
+                  </button>
+                  <button onClick={handleSubmit} disabled={!phone || loading}
+                    className="flex-1 py-3 bg-primary text-white rounded-xl text-sm font-black disabled:opacity-50">
+                    {loading ? 'Submitting...' : 'Submit Request'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 function DownloadIcon(props: any) {
   return (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

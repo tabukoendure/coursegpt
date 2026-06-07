@@ -1,3 +1,4 @@
+import Leaderboard from './pages/Leaderboard';
 import ProWaitlist from './pages/ProWaitlist';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="flashcards" element={<Flashcards />} />
           <Route path="cheatsheet" element={<Cheatsheet />} />
           <Route path="progress" element={<ProgressReport />} />
+          <Route path="leaderboard" element={<Leaderboard />} />
           <Route path="quiz" element={<Quiz />} />
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />

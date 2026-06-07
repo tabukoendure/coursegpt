@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Layout, BookOpen, MessageSquare, Calendar, Upload, User, Settings, LogOut, GraduationCap, Bell, Award, Zap, FileText, Layers, Moon, TrendingUp, Menu, X, ChevronRight } from 'lucide-react';
+import { Layout, BookOpen, MessageSquare, Calendar, Upload, User, Settings, LogOut, GraduationCap, Bell, Award, Zap, FileText, Layers, Moon, TrendingUp, Menu, X, ChevronRight, Trophy } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -78,6 +78,7 @@ export default function DashboardLayout() {
     { name: 'Progress', path: '/dashboard/progress', icon: TrendingUp },
     { name: 'Recap', path: '/dashboard/recap', icon: Award },
     { name: 'Upload & Earn', path: '/dashboard/upload', icon: Upload },
+    { name: 'Leaderboard', path: '/dashboard/leaderboard', icon: Trophy },
   ];
 
   const bottomNavItems = [
