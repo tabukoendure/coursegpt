@@ -106,12 +106,12 @@ Built for Nigerian University Students 🎓
             className="mt-16 pt-10 border-t border-border flex flex-wrap justify-center gap-10 md:gap-20"
           >
             <div className="text-center">
-              <div className="text-3xl font-bold text-text-primary">200+</div>
-              <div className="text-sm text-text-secondary font-medium">Past Questions</div>
+              <div className="text-3xl font-bold text-text-primary">500+</div>
+<div className="text-sm text-text-secondary font-medium">Past Questions</div>
             </div>
             <div className="text-center border-l border-border pl-10 md:pl-20">
-              <div className="text-3xl font-bold text-text-primary">50+</div>
-              <div className="text-sm text-text-secondary font-medium">Courses</div>
+<div className="text-3xl font-bold text-text-primary">100+</div>
+<div className="text-sm text-text-secondary font-medium">Universities</div>
             </div>
             <div className="text-center border-l border-border pl-10 md:pl-20">
               <div className="text-3xl font-bold text-primary flex items-center">
@@ -161,6 +161,17 @@ Built for Nigerian University Students 🎓
                 Enter your exam dates. Get a daily study plan that covers exactly what you need to master before the hall opens.
               </p>
             </div>
+          </div>
+
+          {/* Upload & Earn banner */}
+          <div className="mt-12 bg-primary rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+              <h3 className="text-2xl font-bold text-white mb-2">Upload Past Questions. Earn Airtime. 💸</h3>
+              <p className="text-white/80">Upload your past questions and earn real airtime rewards. Refer friends and earn even more.</p>
+            </div>
+            <button onClick={() => navigate('/register')} className="shrink-0 px-8 py-4 bg-white text-primary rounded-2xl font-bold hover:bg-primary-light transition-all whitespace-nowrap">
+              Start Earning Free
+            </button>
           </div>
         </div>
       </section>
@@ -265,7 +276,7 @@ Built for Nigerian University Students 🎓
           
           <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">Ready to pass your next exam?</h2>
           <p className="text-xl text-primary-light opacity-90 max-w-2xl mx-auto mb-10">
-            Join thousands of Nigerian university students already studying smarter. Start for free — no credit card needed.
+Join thousands of Nigerian university students already studying smarter. Upload past questions, earn airtime rewards, and ace every exam. Free forever.
           </p>
           <button 
             onClick={() => navigate('/register')}

@@ -272,7 +272,8 @@ export default function AdminPanel() {
                   { label: 'Past questions uploaded', value: stats.totalPastQuestions },
                   { label: 'Total AI conversations', value: stats.totalChatSessions },
                   { label: 'Pending withdrawal requests', value: pendingWithdrawals.length },
-                  { label: 'Total pending payout amount', value: `₦${pendingWithdrawals.reduce((sum, w) => sum + (w.amount_requested || 0), 0)}` },
+{ label: 'Total pending payout amount', value: `₦${pendingWithdrawals.reduce((sum, w) => sum + (w.amount_requested || 0), 0)}` },
+{ label: 'Total points owed to all users', value: `${users.reduce((sum, u) => sum + (u.points || 0), 0)} pts = ₦${users.reduce((sum, u) => sum + (u.points || 0), 0)}` },
                 ].map(item => (
                   <div key={item.label} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-0">
                     <span className="text-sm font-bold text-gray-600">{item.label}</span>
