@@ -12,6 +12,7 @@ export default function Profile() {
   const [success, setSuccess] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [referralCount, setReferralCount] = React.useState(0);
+const [transactions, setTransactions] = React.useState<any[]>([]);
   const [form, setForm] = React.useState({
     full_name: '',
     level: '',
@@ -39,8 +40,16 @@ export default function Profile() {
             .from('profiles')
             .select('*', { count: 'exact', head: true })
             .eq('referred_by', data.referral_code);
-          setReferralCount(count || 0);
-        }
+setReferralCount(count || 0);
+
+const { data: txData } = await supabase
+  .from('transactions')
+  .select('*')
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false })
+  .limit(20);
+setTransactions(txData || []);
+          }
       } catch (err) {
         console.error(err);
       } finally {
@@ -273,6 +282,43 @@ const airtimeValue = totalPoints;
         </div>
       </div>
 
+{/* Transaction History */}
+      <div className="bg-white border border-border rounded-[2rem] overflow-hidden">
+        <div className="p-6 border-b border-border flex items-center justify-between">
+          <h3 className="font-black text-text-primary">Transaction History</h3>
+          <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">{transactions.length} records</span>
+        </div>
+        {transactions.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm font-black text-text-primary mb-1">No transactions yet</p>
+            <p className="text-xs text-text-secondary">Upload past questions or refer friends to start earning</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {transactions.map((tx, i) => (
+              <div key={i} className="flex items-center justify-between px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-sm ${
+                    tx.type === 'upload' ? 'bg-primary/10 text-primary' :
+                    tx.type === 'referral' ? 'bg-success/10 text-success' :
+                    'bg-error/10 text-error'
+                  }`}>
+                    {tx.type === 'upload' ? '📤' : tx.type === 'referral' ? '👥' : '💸'}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-text-primary">{tx.description}</p>
+                    <p className="text-[10px] text-text-secondary">{new Date(tx.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                  </div>
+                </div>
+                <div className={`font-black text-sm ${tx.points > 0 ? 'text-success' : 'text-error'}`}>
+                  {tx.points > 0 ? '+' : ''}{tx.points} pts
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      
       <div className="md:hidden space-y-3">
         <Link to="/dashboard/settings" className="flex items-center justify-between bg-white border border-border rounded-2xl px-5 py-4 group hover:bg-bg transition-all">
           <div className="flex items-center gap-3">
