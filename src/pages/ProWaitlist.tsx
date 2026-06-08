@@ -42,6 +42,8 @@ export default function ProWaitlist() {
       console.log('PaystackPop:', (window as any).PaystackPop);
       console.log('Key:', PAYSTACK_PUBLIC_KEY);
       console.log('Plan:', PRO_PLAN);
+      console.log('Email:', user?.email);
+console.log('Amount:', planType === 'pro' ? 150000 : 250000);
       const handler = (window as any).PaystackPop.setup({
         key: PAYSTACK_PUBLIC_KEY,
         email: user.email,
