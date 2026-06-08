@@ -38,53 +38,56 @@ export default function ProWaitlist() {
     const planCode = planType === 'pro' ? PRO_PLAN : PREMIUM_PLAN;
     const amount = planType === 'pro' ? 150000 : 250000;
 
-    try {
-      console.log('PaystackPop:', (window as any).PaystackPop);
-      console.log('Key:', PAYSTACK_PUBLIC_KEY);
-      console.log('Plan:', PRO_PLAN);
-      console.log('Email:', user?.email);
-console.log('Amount:', planType === 'pro' ? 150000 : 250000);
-      const handler = (window as any).PaystackPop.newTransaction({
-  key: PAYSTACK_PUBLIC_KEY,
-  email: user.email,
-  amount,
-  plan: planCode,
-  currency: 'NGN',
-  ref: `coursegpt_${planType}_${user.id}_${Date.now()}`,
-  onSuccess: async (response: any) => {
-    try {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
-      await supabase.from('profiles').update({
-        plan: planType,
-        is_pro: true,
-        pro_expires_at: expiresAt.toISOString(),
-        paystack_subscription_code: response.reference,
-      }).eq('id', user.id);
-      await supabase.from('transactions').insert([{
-        user_id: user.id,
-        type: 'subscription',
-        points: 0,
-        description: `${planType === 'pro' ? 'Pro Student' : 'Premium'} subscription — ₦${planType === 'pro' ? '1,500' : '2,500'}/month`,
-      }]);
-      setProfile((prev: any) => ({ ...prev, plan: planType, is_pro: true }));
-      setSuccess(`🎉 You are now on the ${planType === 'pro' ? 'Pro Student' : 'Premium'} plan!`);
-      setTimeout(() => setSuccess(''), 5000);
-    } catch (err) {
-      console.error('Profile update error:', err);
-    }
+try {
+  const PaystackPop = (window as any).PaystackPop;
+  if (!PaystackPop || !PaystackPop.setup) {
+    setError('Payment system not ready. Please refresh the page and try again.');
     setSubscribing(null);
-  },
-  onCancel: () => {
-    setSubscribing(null);
-  },
-});
+    return;
+  }
 
-      handler.openIframe();
-    } catch (err: any) {
-      setError('Failed to load payment. Please try again.');
+  const handler = PaystackPop.setup({
+    key: PAYSTACK_PUBLIC_KEY,
+    email: user.email,
+    amount: planType === 'pro' ? 150000 : 250000,
+    plan: planType === 'pro' ? PRO_PLAN : PREMIUM_PLAN,
+    currency: 'NGN',
+    ref: `coursegpt_${planType}_${user.id}_${Date.now()}`,
+    callback: async (response: any) => {
+      try {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
+        await supabase.from('profiles').update({
+          plan: planType,
+          is_pro: true,
+          pro_expires_at: expiresAt.toISOString(),
+          paystack_subscription_code: response.reference,
+        }).eq('id', user.id);
+        await supabase.from('transactions').insert([{
+          user_id: user.id,
+          type: 'subscription',
+          points: 0,
+          description: `${planType === 'pro' ? 'Pro Student' : 'Premium'} subscription — ₦${planType === 'pro' ? '1,500' : '2,500'}/month`,
+        }]);
+        setProfile((prev: any) => ({ ...prev, plan: planType, is_pro: true }));
+        setSuccess(`🎉 You are now on the ${planType === 'pro' ? 'Pro Student' : 'Premium'} plan!`);
+        setTimeout(() => setSuccess(''), 5000);
+      } catch (err) {
+        console.error('Profile update error:', err);
+      }
       setSubscribing(null);
-    }
+    },
+    onClose: () => {
+      setSubscribing(null);
+    },
+  });
+
+  handler.openIframe();
+} catch (err: any) {
+  console.error('Paystack setup error:', err?.message, err);
+  setError(`Payment error: ${err?.message || 'Unknown error'}`);
+  setSubscribing(null);
+}
   };
 
   const handleCancelSubscription = async () => {
