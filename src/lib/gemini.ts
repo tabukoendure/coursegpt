@@ -89,7 +89,21 @@ export async function checkDailyLimit(
   supabase: any,
   userId: string
 ): Promise<{ allowed: boolean; remaining: number; count: number }> {
-  const FREE_LIMIT = 30;
+  // Get user plan
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan, is_pro, pro_expires_at')
+    .eq('id', userId)
+    .maybeSingle();
+
+  // Check if pro has expired
+  let currentPlan = profile?.plan || 'free';
+  if (profile?.pro_expires_at && new Date(profile.pro_expires_at) < new Date()) {
+    currentPlan = 'free';
+    await supabase.from('profiles').update({ plan: 'free', is_pro: false }).eq('id', userId);
+  }
+
+  const LIMIT = currentPlan === 'premium' ? 99999 : currentPlan === 'pro' ? 30 : 10;
   const today = new Date().toISOString().split('T')[0];
   try {
     const { data, error } = await supabase
@@ -100,12 +114,12 @@ export async function checkDailyLimit(
       .maybeSingle();
     if (error) throw error;
     const count = data?.message_count || 0;
-    const allowed = count < FREE_LIMIT;
-    const remaining = Math.max(0, FREE_LIMIT - count);
-    return { allowed, remaining, count };
+    const allowed = count < LIMIT;
+const remaining = Math.max(0, LIMIT - count);
+return { allowed, remaining, count };
   } catch (err) {
     console.error('Usage check error:', err);
-    return { allowed: true, remaining: FREE_LIMIT, count: 0 };
+return { allowed: true, remaining: 10, count: 0 };
   }
 }
 

@@ -480,13 +480,13 @@ Then give:
           <div className="flex justify-between items-center mb-1">
             <span className="text-[9px] font-black text-text-secondary uppercase tracking-widest">Daily AI Messages</span>
             <span className={`text-[9px] font-black ${messagesRemaining < 5 ? 'text-error' : 'text-primary'}`}>
-              {messagesRemaining}/30
+              {messagesRemaining === 99999 ? '∞' : messagesRemaining}
             </span>
           </div>
           <div className="h-1.5 w-full bg-border rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${messagesRemaining < 5 ? 'bg-error' : 'bg-primary'}`}
-              style={{ width: `${(messagesRemaining / 30) * 100}%` }}
+              style={{ width: `${messagesRemaining === 99999 ? 100 : (messagesRemaining / 30) * 100}%` }}
             />
           </div>
           {messagesRemaining < 10 && (
