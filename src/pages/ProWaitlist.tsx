@@ -53,17 +53,16 @@ try {
     plan: planType === 'pro' ? PRO_PLAN : PREMIUM_PLAN,
     currency: 'NGN',
     ref: `coursegpt_${planType}_${user.id}_${Date.now()}`,
-    callback: async (response: any) => {
-      try {
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
-        await supabase.from('profiles').update({
-          plan: planType,
-          is_pro: true,
-          pro_expires_at: expiresAt.toISOString(),
-          paystack_subscription_code: response.reference,
-        }).eq('id', user.id);
-        await supabase.from('transactions').insert([{
+    callback: (response: any) => {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+      supabase.from('profiles').update({
+        plan: planType,
+        is_pro: true,
+        pro_expires_at: expiresAt.toISOString(),
+        paystack_subscription_code: response.reference,
+      }).eq('id', user.id).then(() => {
+        supabase.from('transactions').insert([{
           user_id: user.id,
           type: 'subscription',
           points: 0,
@@ -72,10 +71,11 @@ try {
         setProfile((prev: any) => ({ ...prev, plan: planType, is_pro: true }));
         setSuccess(`🎉 You are now on the ${planType === 'pro' ? 'Pro Student' : 'Premium'} plan!`);
         setTimeout(() => setSuccess(''), 5000);
-      } catch (err) {
+        setSubscribing(null);
+      }, (err: any) => {
         console.error('Profile update error:', err);
-      }
-      setSubscribing(null);
+        setSubscribing(null);
+      });
     },
     onClose: () => {
       setSubscribing(null);
