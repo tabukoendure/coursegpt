@@ -39,19 +39,6 @@ export default function ProWaitlist() {
     const amount = planType === 'pro' ? 150000 : 250000;
 
     try {
-      // Load Paystack inline
-      const PaystackPop = (window as any).PaystackPop;
-      if (!PaystackPop) {
-        // Load Paystack script dynamically
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://js.paystack.co/v1/inline.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
       const handler = (window as any).PaystackPop.setup({
         key: PAYSTACK_PUBLIC_KEY,
         email: user.email,
