@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
 import { askGemini } from '../lib/gemini';
 import { extractTextFromFile } from '../lib/pdfExtract';
+import { checkPdfUpload, incrementPdfCount } from '../lib/planLimits';
+import { getUserPlan, PLAN_LIMITS, PLAN_LABELS } from '../lib/planLimits';
 
 interface MCQ {
   type: 'mcq';
@@ -26,7 +28,7 @@ export default function Quiz() {
   const [exams, setExams] = React.useState<any[]>([]);
   const [selectedExam, setSelectedExam] = React.useState<any>(null);
   const [quizType, setQuizType] = React.useState<'mcq' | 'theory' | 'both'>('mcq');
-  const [questionCount, setQuestionCount] = React.useState<number>(10);
+const [questionCount, setQuestionCount] = React.useState<number>(5);
   const [questions, setQuestions] = React.useState<Question[]>([]);
   const [currentIdx, setCurrentIdx] = React.useState(0);
   const [selectedAnswer, setSelectedAnswer] = React.useState<string | null>(null);
@@ -44,13 +46,17 @@ export default function Quiz() {
   const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [pdfText, setPdfText] = React.useState('');
   const [pdfLoading, setPdfLoading] = React.useState(false);
+  const [pdfError, setPdfError] = React.useState<string | null>(null);
+  const [userPlan, setUserPlan] = React.useState<'free'|'pro'|'premium'>('free');
 
   React.useEffect(() => { fetchData(); }, []);
 
-  const fetchData = async () => {
+const fetchData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      const plan = await getUserPlan(user.id);
+      setUserPlan(plan);
       const { data: examsData } = await supabase
         .from('user_exams').select('*').eq('user_id', user.id)
         .order('exam_date', { ascending: true });
@@ -65,12 +71,23 @@ export default function Quiz() {
   };
 
   const handlePdfUpload = async (file: File) => {
+    setPdfError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const limitError = await checkPdfUpload(file, user.id);
+    if (limitError) {
+      setPdfError(limitError);
+      return;
+    }
+
     setPdfFile(file);
     setPdfLoading(true);
     setPdfText('');
     try {
       const { text } = await extractTextFromFile(file);
       setPdfText(text);
+      incrementPdfCount();
     } catch (err) {
       console.error('PDF read error:', err);
     } finally {
@@ -147,6 +164,17 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
       }
 
       const response = await askGemini(prompt, selectedExam.course_code);
+
+      if (response === 'RATE_LIMIT_ERROR') {
+        if (retryCount < 2) {
+          setGenLoading(false);
+          setTimeout(() => generateQuiz(retryCount + 1), 5000);
+          return;
+        }
+        setGenError('AI is busy right now. Please wait 30 seconds and try again.');
+        return;
+      }
+
       const parsed = parseQuestions(response);
 
       if (parsed && parsed.length > 0) {
@@ -380,10 +408,48 @@ Return ONLY a valid JSON array mixing both types, no explanation, no markdown, n
               <div>
                 <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 block">Number of Questions</label>
                 <div className="grid grid-cols-4 gap-2">
-                  {[10, 20, 30, 50].map(count => (
-                    <button key={count} onClick={() => setQuestionCount(count)} className={`py-2.5 rounded-xl text-[10px] font-black transition-all border ${questionCount === count ? 'bg-primary text-white border-primary' : 'bg-bg border-border text-text-secondary hover:border-primary/40'}`}>{count}</button>
-                  ))}
+                  {[5, 10, 20, 30].map(count => {
+                    const maxAllowed = userPlan === 'free' ? 10 : userPlan === 'pro' ? 20 : 30;
+                    const disabled = count > maxAllowed;
+                    return (
+                      <button
+                        key={count}
+                        onClick={() => !disabled && setQuestionCount(count)}
+                        disabled={disabled}
+                        title={disabled ? `Upgrade to access ${count} questions` : ''}
+                        className={`py-2.5 rounded-xl text-[10px] font-black transition-all border ${questionCount === count ? 'bg-primary text-white border-primary' : disabled ? 'bg-bg border-border text-text-secondary opacity-30 cursor-not-allowed' : 'bg-bg border-border text-text-secondary hover:border-primary/40'}`}
+                      >{count}</button>
+                    );
+                  })}
                 </div>
+              </div>
+
+              {pdfError && (
+                <div className="p-3 bg-error/10 border border-error/20 rounded-xl text-xs font-bold text-error">
+                  {pdfError}
+                  <a href="/pro" className="ml-2 underline font-black">Upgrade →</a>
+                </div>
+              )}
+
+              {/* Plan info */}
+              <div className="p-3 bg-bg rounded-xl border border-border">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Your Plan</span>
+                  <span className="text-[10px] font-black text-primary uppercase">{PLAN_LABELS[userPlan]}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-text-secondary font-bold">PDF uploads today</span>
+                  <span className="text-[10px] font-black text-text-primary">
+                    {PLAN_LIMITS[userPlan].dailyPdfUploads === Infinity ? 'Unlimited' : `${PLAN_LIMITS[userPlan].dailyPdfUploads}/day`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="text-[10px] text-text-secondary font-bold">Max PDF size</span>
+                  <span className="text-[10px] font-black text-text-primary">{PLAN_LIMITS[userPlan].pdfSizeMB}MB</span>
+                </div>
+                {userPlan === 'free' && (
+                  <a href="/pro" className="block mt-2 text-[10px] font-black text-primary uppercase tracking-widest hover:underline">Upgrade for more →</a>
+                )}
               </div>
 
               <div className={`p-3 rounded-xl border ${pdfText ? 'bg-primary/5 border-primary/20' : 'bg-orange-50 border-orange-200'}`}>

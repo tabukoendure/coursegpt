@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import { askGemini } from '../lib/gemini';
 import { extractTextFromFile } from '../lib/pdfExtract';
 import Markdown from 'react-markdown';
+import { checkPdfUpload, incrementPdfCount } from '../lib/planLimits';
+import { getUserPlan, PLAN_LIMITS, PLAN_LABELS } from '../lib/planLimits';
 
 export default function Cheatsheet() {
   const [exams, setExams] = React.useState<any[]>([]);
@@ -15,29 +17,44 @@ export default function Cheatsheet() {
   const [pdfFile, setPdfFile] = React.useState<File | null>(null);
   const [pdfText, setPdfText] = React.useState('');
   const [pdfLoading, setPdfLoading] = React.useState(false);
+  const [pdfError, setPdfError] = React.useState<string | null>(null);
+  const [userPlan, setUserPlan] = React.useState<'free'|'pro'|'premium'>('free');
 
   React.useEffect(() => { fetchExams(); }, []);
 
   const fetchExams = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase
         .from('user_exams').select('*').eq('user_id', user.id)
         .order('exam_date', { ascending: true });
+      const plan = await getUserPlan(user.id);
+      setUserPlan(plan);
       setExams(data || []);
       if (data && data.length > 0) setSelectedExam(data[0]);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
 
-  const handlePdfUpload = async (file: File) => {
+const handlePdfUpload = async (file: File) => {
+    setPdfError(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const limitError = await checkPdfUpload(file, user.id);
+    if (limitError) {
+      setPdfError(limitError);
+      return;
+    }
+
     setPdfFile(file);
     setPdfLoading(true);
     setPdfText('');
     try {
       const { text } = await extractTextFromFile(file);
       setPdfText(text);
+      incrementPdfCount();
     } catch (err) {
       console.error('PDF read error:', err);
     } finally {
@@ -200,9 +217,36 @@ Keep it SHORT and SCANNABLE. Use **bold** for key terms. Nigerian university con
                 </div>
               </div>
 
+              {pdfError && (
+                <div className="p-3 bg-error/10 border border-error/20 rounded-xl text-xs font-bold text-error">
+                  {pdfError}
+                  <a href="/pro" className="ml-2 underline font-black">Upgrade →</a>
+                </div>
+              )}
+
+              <div className="p-3 bg-bg rounded-xl border border-border">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Your Plan</span>
+                  <span className="text-[10px] font-black text-primary uppercase">{PLAN_LABELS[userPlan]}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-text-secondary font-bold">PDF uploads today</span>
+                  <span className="text-[10px] font-black text-text-primary">
+                    {PLAN_LIMITS[userPlan].dailyPdfUploads === Infinity ? 'Unlimited' : `${PLAN_LIMITS[userPlan].dailyPdfUploads}/day`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="text-[10px] text-text-secondary font-bold">Max PDF size</span>
+                  <span className="text-[10px] font-black text-text-primary">{PLAN_LIMITS[userPlan].pdfSizeMB}MB</span>
+                </div>
+                {userPlan === 'free' && (
+                  <a href="/pro" className="block mt-2 text-[10px] font-black text-primary uppercase tracking-widest hover:underline">Upgrade for more →</a>
+                )}
+              </div>
+
               <div className={`p-3 rounded-xl border ${pdfText ? 'bg-primary/5 border-primary/20' : 'bg-orange-50 border-orange-200'}`}>
                 <p className={`text-[10px] font-black uppercase tracking-widest ${pdfText ? 'text-primary' : 'text-orange-600'}`}>
-                  {pdfText ? '📄 Cheatsheet will be generated from your PDF' : '⚠️ Upload a PDF for a more accurate cheatsheet'}
+                  {pdfText ? '📄 Flashcards will be generated from your PDF' : '⚠️ Upload a PDF for accurate flashcards'}
                 </p>
               </div>
 

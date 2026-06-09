@@ -10,6 +10,8 @@ import Markdown from 'react-markdown';
 import { supabase } from '../lib/supabase';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import { checkPdfUpload, incrementPdfCount } from '../lib/planLimits';
+import { getUserPlan, PLAN_LIMITS, PLAN_LABELS } from '../lib/planLimits';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -44,7 +46,9 @@ export default function AiTutor() {
   const [sessionsLoading, setSessionsLoading] = React.useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [currentUser, setCurrentUser] = React.useState<any>(null);
+  const [userPlan, setUserPlan] = React.useState<'free'|'pro'|'premium'>('free');
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const [pdfError, setPdfError] = React.useState<string | null>(null);
 
   // Daily limit
   const [messagesRemaining, setMessagesRemaining] = React.useState(30);
@@ -75,8 +79,10 @@ export default function AiTutor() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUser(user);
-        const { data: profile } = await supabase.from('profiles').select('university').eq('id', user.id).maybeSingle();
-setUserUniversity(profile?.university || '');
+        const { data: profile } = await supabase.from('profiles').select('university, plan, is_pro, pro_expires_at').eq('id', user.id).maybeSingle();
+        setUserUniversity(profile?.university || '');
+        const plan = await getUserPlan(user.id);
+        setUserPlan(plan);
         fetchSessions(user.id);
         loadDailyLimit(user.id);
       }
@@ -161,19 +167,28 @@ setUserUniversity(profile?.university || '');
     return { text: fullText, pages: pdf.numPages };
   };
 
-  const handleFileUpload = async () => {
+const handleFileUpload = async () => {
     if (!pdfFile || !uploadCourseCode.trim()) return;
+    const user = currentUser;
+    if (!user) return;
+
+    setPdfError(null);
+    const limitError = await checkPdfUpload(pdfFile, user.id);
+    if (limitError) {
+      setPdfError(limitError);
+      return;
+    }
+
     try {
       setUploading(true);
-      const user = currentUser;
-      if (!user) return;
 
       const fileName = `${Date.now()}_${pdfFile.name}`;
       const filePath = `${user.id}/pdfs/${fileName}`;
       await supabase.storage.from('past-questions').upload(filePath, pdfFile);
 
       const { text, pages } = await extractPDFText(pdfFile);
-      setPdfContext(text);
+      incrementPdfCount();
+            setPdfContext(text);
       setPdfName(pdfFile.name);
       setActiveCourseCode(uploadCourseCode.toUpperCase());
 
@@ -775,10 +790,19 @@ Then give:
                   <div className="space-y-2">
                     <FileUp className="h-10 w-10 text-text-secondary mx-auto opacity-30" />
                     <div className="text-sm font-bold text-text-primary">Drop PDF here or click to browse</div>
-                    <p className="text-[10px] text-text-secondary">PDF files up to 15MB</p>
+                    <p className="text-[10px] text-text-secondary">
+                      PDF up to {PLAN_LIMITS[userPlan].pdfSizeMB}MB • {PLAN_LIMITS[userPlan].dailyPdfUploads === Infinity ? 'Unlimited' : `${PLAN_LIMITS[userPlan].dailyPdfUploads}/day`} uploads ({PLAN_LABELS[userPlan]} plan)
+                    </p>
                   </div>
                 )}
               </div>
+
+{pdfError && (
+                <div className="p-3 bg-error/10 border border-error/20 rounded-xl text-xs font-bold text-error">
+                  {pdfError}
+                  <a href="/pro" className="ml-2 underline font-black">Upgrade →</a>
+                </div>
+              )}
 
               <input
                 type="text"

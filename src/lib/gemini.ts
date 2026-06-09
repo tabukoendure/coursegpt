@@ -252,18 +252,20 @@ Important: Base your answer entirely on the document above. If the answer is not
 
     messages.push({ role: 'user', content: finalPrompt });
 
+    const isQuizMode = mode === 'quiz' || prompt.includes('"type":"mcq"') || prompt.includes('"type":"theory"');
+
     const completion = await groq.chat.completions.create({
       model: "llama-3.1-8b-instant",
       messages,
       temperature: 0.7,
-      max_tokens: 1024,
+      max_tokens: isQuizMode ? 2048 : 1024,
     });
 
     return completion.choices[0]?.message?.content || "I could not generate a response. Please try again.";
   } catch (error: any) {
     console.error("AI Error:", error);
     if (error?.message?.includes('429') || error?.message?.includes('rate_limit')) {
-      return "I am getting too many requests right now. Please wait 10 seconds and try again.";
+      return "RATE_LIMIT_ERROR";
     }
     return `Error: ${error instanceof Error ? error.message : "Failed to connect to AI."}`;
   }
