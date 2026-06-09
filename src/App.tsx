@@ -23,6 +23,9 @@ import Onboarding from './pages/Onboarding';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
+import About from './pages/About';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 
 export default function App() {
   return (
@@ -64,7 +67,10 @@ export default function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
         </Route>
-
+<Route path="/about" element={<About />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
