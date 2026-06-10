@@ -1,11 +1,12 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
+import { hashFile, getCachedPdfText, cachePdfText } from './aiOptimizer';
 
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 }
 
-export async function extractTextFromFile(file: File): Promise<{ text: string; pages: number }> {
+async function extractRawText(file: File): Promise<{ text: string; pages: number }> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   let fullText = '';
@@ -21,3 +22,22 @@ export async function extractTextFromFile(file: File): Promise<{ text: string; p
   }
   return { text: fullText.trim(), pages: pdf.numPages };
 }
+
+export async function extractTextFromFile(file: File): Promise<{ text: string; pages: number; fromCache?: boolean }> {
+  try {
+    const fileHash = await hashFile(file);
+    const cached = await getCachedPdfText(fileHash);
+    if (cached) {
+      console.log('PDF cache hit — skipping extraction');
+      return { ...cached, fromCache: true };
+    }
+    const result = await extractRawText(file);
+    await cachePdfText(fileHash, result.text, result.pages, file.size);
+    return { ...result, fromCache: false };
+  } catch (err) {
+    console.error('extractTextFromFile error:', err);
+    return extractRawText(file);
+  }
+}
+
+export { hashFile };

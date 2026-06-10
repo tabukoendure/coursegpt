@@ -1,4 +1,5 @@
 import Groq from 'groq-sdk';
+import { getThrottleDelay, getCachedResponse, cacheResponse, getRelevantChunks, compressHistory, askGeminiFlash, shouldUseGemini } from './aiOptimizer';
 
 let groqInstance: Groq | null = null;
 
@@ -103,7 +104,7 @@ export async function checkDailyLimit(
     await supabase.from('profiles').update({ plan: 'free', is_pro: false }).eq('id', userId);
   }
 
-  const LIMIT = currentPlan === 'premium' ? 99999 : currentPlan === 'pro' ? 30 : 10;
+const LIMIT = currentPlan === 'premium' ? 200 : currentPlan === 'pro' ? 50 : 10;
   const today = new Date().toISOString().split('T')[0];
   try {
     const { data, error } = await supabase
@@ -209,16 +210,46 @@ export async function askGemini(
   mode: 'explain' | 'predict' | 'quiz' | 'mark' | 'summarize' | 'general' = 'general',
   pdfContext?: string,
   conversationHistory?: { role: 'user' | 'assistant'; content: string }[],
-  university?: string
+  university?: string,
+  pdfHash?: string
 ): Promise<string> {
   try {
+    const { shouldThrottle, getThrottleDelay, getCachedResponse, cacheResponse, getRelevantChunks, compressHistory, askGeminiFlash, shouldUseGemini } = await import('./aiOptimizer');
+
+    // Throttle if sending too fast
+    const throttleDelay = getThrottleDelay('global');
+    if (throttleDelay > 0) {
+      await new Promise(resolve => setTimeout(resolve, throttleDelay));
+    }
+
+    // Check AI response cache for PDF tools
+    if (pdfHash && pdfContext) {
+      const cached = await getCachedResponse(pdfHash, prompt, mode);
+      if (cached) {
+        console.log('AI response cache hit');
+        return cached;
+      }
+    }
+
     const groq = getGroq();
     let finalPrompt = prompt;
 
-    if (pdfContext) {
+    // Smart chunking — only send relevant parts of PDF
+    let optimizedPdfContext = pdfContext;
+    if (pdfContext && pdfContext.length > 1500) {
+      optimizedPdfContext = getRelevantChunks(pdfContext, prompt, 1500);
+    }
+
+    // Compress conversation history
+    const compressedHistory = conversationHistory ? compressHistory(conversationHistory) : [];
+
+    // Decide which AI to use
+    const useGemini = shouldUseGemini(mode, !!pdfContext, (optimizedPdfContext || prompt).length);
+
+    if (optimizedPdfContext) {
       finalPrompt = `DOCUMENT CONTENT (answer ONLY from this document):
 ---
-${pdfContext}
+${optimizedPdfContext}
 ---
 
 Student question: ${prompt}
@@ -239,15 +270,25 @@ Important: Base your answer entirely on the document above. If the answer is not
       }
     }
 
+// Use Gemini Flash for PDF-heavy tasks
+    if (useGemini) {
+      try {
+        const systemPrompt = buildSystemPrompt(university);
+        const response = await askGeminiFlash(finalPrompt, systemPrompt);
+        // Cache the response
+        if (pdfHash) await cacheResponse(pdfHash, prompt, mode, response);
+        return response;
+      } catch (geminiErr) {
+        console.warn('Gemini failed, falling back to Groq:', geminiErr);
+      }
+    }
+
     const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: buildSystemPrompt(university) }
     ];
 
-    if (conversationHistory && conversationHistory.length > 0) {
-      const recentHistory = conversationHistory.slice(-6);
-      for (const msg of recentHistory) {
-        messages.push({ role: msg.role, content: msg.content });
-      }
+    for (const msg of compressedHistory) {
+      messages.push({ role: msg.role, content: msg.content });
     }
 
     messages.push({ role: 'user', content: finalPrompt });
@@ -261,7 +302,12 @@ Important: Base your answer entirely on the document above. If the answer is not
       max_tokens: isQuizMode ? 2048 : 1024,
     });
 
-    return completion.choices[0]?.message?.content || "I could not generate a response. Please try again.";
+    const response = completion.choices[0]?.message?.content || "I could not generate a response. Please try again.";
+
+    // Cache the response if PDF-based
+    if (pdfHash) await cacheResponse(pdfHash, prompt, mode, response);
+
+    return response;
   } catch (error: any) {
     console.error("AI Error:", error);
     if (error?.message?.includes('429') || error?.message?.includes('rate_limit')) {
