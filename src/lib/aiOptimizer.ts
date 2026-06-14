@@ -180,8 +180,7 @@ export async function askGeminiFlash(prompt: string, systemContext?: string): Pr
 
 // ─── SMART AI ROUTER ─────────────────────────────────────────────────────────
 export function shouldUseGemini(toolType: string, hasPdf: boolean, promptLength: number): boolean {
-  if (hasPdf && promptLength > 2000) return true;
-  if (toolType === 'summarize' || toolType === 'flashcards') return true;
+  // Keep everything on Groq — better quality responses
   return false;
 }
 

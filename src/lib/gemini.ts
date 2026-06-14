@@ -239,8 +239,8 @@ export async function askGemini(
 
     // Smart chunking — only send relevant parts of PDF
     let optimizedPdfContext = pdfContext;
-    if (pdfContext && pdfContext.length > 1500) {
-      optimizedPdfContext = getRelevantChunks(pdfContext, prompt, 1500);
+    if (pdfContext && pdfContext.length > 3000) {
+      optimizedPdfContext = getRelevantChunks(pdfContext, prompt, 3000);
     }
 
     // Compress conversation history
@@ -297,12 +297,13 @@ Important: Base your answer entirely on the document above. If the answer is not
     messages.push({ role: 'user', content: finalPrompt });
 
     const isQuizMode = mode === 'quiz' || prompt.includes('"type":"mcq"') || prompt.includes('"type":"theory"');
+    const isPdfMode = !!pdfHash || mode === 'summarize' || mode === 'explain';
 
     const completion = await groq.chat.completions.create({
       model: "llama-3.1-8b-instant",
       messages,
       temperature: 0.7,
-      max_tokens: isQuizMode ? 2048 : 1024,
+      max_tokens: isQuizMode ? 2048 : isPdfMode ? 2048 : 1024,
     });
 
     const response = completion.choices[0]?.message?.content || "I could not generate a response. Please try again.";
